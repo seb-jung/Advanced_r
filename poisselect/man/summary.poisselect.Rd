@@ -2,34 +2,35 @@
 % Please edit documentation in R/methods_summary.R
 \name{summary.poisselect}
 \alias{summary.poisselect}
-\title{Summarise a fitted Poisson selection model}
+\title{Summarise a Poisson Selection Model}
 \usage{
 \method{summary}{poisselect}(object, ...)
 }
 \arguments{
 \item{object}{An object of class \code{"poisselect"}.}
 
-\item{...}{Ignored (present for compatibility with the generic).}
+\item{...}{Currently ignored, present for consistency with the generic.}
 }
 \value{
-An object of class \code{"summary.poisselect"}: a list with the
-\code{call}, the matrices \code{coefficients_outcome} and
-\code{coefficients_selection} (columns \code{Estimate}, \verb{Std. Error}, \verb{z value},
-\verb{Pr(>|z|)}), \code{sigma}, \code{rho}, \code{loglik}, \code{aic}, \code{n}, \code{n_selected},
-\code{convergence} and \code{k}.
+An object of class \code{"summary.poisselect"}, a list with the
+coefficient tables \code{coefficients$outcome}, \code{coefficients$selection} and
+\code{error_terms}, plus \code{sigma}, \code{rho}, the log-likelihood, the AIC, the
+sample sizes and the convergence information.
 }
 \description{
-Computes full coefficient tables (estimate, standard error, z value,
-two-sided p value) for both the outcome and the selection equation and
-collects rho, sigma, log-likelihood and AIC.
+Builds the full coefficient tables of both equations. Each row reports the
+estimate, its standard error, the Wald statistic \code{z = Estimate / SE} and the
+two-sided p-value of the hypothesis that the coefficient is zero, using the
+asymptotic standard normal distribution of \code{z} under that hypothesis. The
+error parameters \code{sigma} and \code{rho} get the same treatment; the row for \code{rho}
+is a direct test for selection bias, because \code{rho = 0} means that the
+selection is ignorable.
 }
 \examples{
-set.seed(1)
-d <- simulate_poisselect(300,
-  beta = c(1, 0.5), gamma = c(0.5, 1, -0.8),
-  sigma = 0.5, rho = 0.5
-)
-fit <- poisselect(y ~ x1, s ~ x1 + w1, data = d, k = 8)
+fit <- poisselect(y ~ x1 + x2, s ~ x1 + z1, data = sim_selection)
 summary(fit)
+
+# The coefficient tables are ordinary matrices.
+summary(fit)$coefficients$outcome
 
 }

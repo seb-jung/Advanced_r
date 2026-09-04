@@ -1,89 +1,97 @@
-# Data generator matching the model exactly; used by the recovery tests,
-# the examples, and for trying out the package.
-
-#' Simulate data from the Poisson selection model
+#' Simulate Data from a Poisson Selection Model
 #'
-#' Generates a dataset that follows the poisselect model exactly. Shared
-#' covariates `x1, ..., x_{p-1}` (iid standard normal) enter both
-#' equations; additional covariates `w1, ..., w_{q-p}` (iid standard
-#' normal) enter only the selection equation and act as exclusion
-#' restrictions. The errors are built as `eps = sigma * v` and
-#' `u = rho * v + sqrt(1 - rho^2) * e` with independent standard normal
-#' `v`, `e`, which yields `Var(u) = 1` and `Corr(eps, u) = rho` exactly.
-#' The outcome is drawn as `y ~ Poisson(exp(x'beta + eps))`, selection as
-#' `s = 1{z'gamma + u > 0}`, and `y` is set to `NA` wherever `s = 0` -
-#' exactly like real data for this model.
+#' Draws a data set that follows the model of [poisselect()] exactly, which
+#' makes it possible to check whether the estimator recovers known parameters.
 #'
-#' @param n Single integerish value `>= 50`, the number of units.
-#' @param beta Finite numeric vector of outcome coefficients (intercept
-#'   first), length `p >= 1`.
-#' @param gamma Finite numeric vector of selection coefficients (intercept
-#'   first), length `q >= p`; the last `q - p` entries belong to the
-#'   selection-only covariates `w`.
-#' @param sigma Single positive finite number: standard deviation of the
-#'   outcome heterogeneity.
-#' @param rho Single number strictly between -1 and 1: correlation of the
-#'   two error terms.
+#' @details
+#' Three standard normal covariates are drawn: `x1` and `x2` enter the outcome
+#' equation, `x1` and `z1` the selection equation, so `z1` is the exclusion
+#' restriction that identifies the model. Both equations contain an intercept,
+#' hence `beta` and `gamma` have three elements each, ordered as
+#' `c(intercept, x1, x2)` and `c(intercept, x1, z1)`.
 #'
-#' @return A `data.frame` with columns `y` (counts, `NA` where `s = 0`),
-#'   `s` (0/1), the shared covariates `x1, ...` (if `p > 1`) and the
-#'   selection-only covariates `w1, ...` (if `q > p`).
+#' The correlated errors are built from two independent standard normal draws
+#' \eqn{u} and \eqn{e} as \eqn{\varepsilon = \sigma(\rho u +
+#' \sqrt{1-\rho^2}\,e)}, which gives \eqn{\mathrm{Var}(\varepsilon) =
+#' \sigma^2}, \eqn{\mathrm{Var}(u) = 1} and \eqn{\mathrm{Cov}(\varepsilon, u)
+#' = \rho\sigma}. The function uses the random number generator of the current
+#' session, so call [set.seed()] beforehand for reproducible data.
+#'
+#' @param n Number of units, a single integer of at least 2.
+#' @param beta Numeric vector of length 3 with the coefficients of the outcome
+#'   equation, ordered as `c(intercept, x1, x2)`.
+#' @param gamma Numeric vector of length 3 with the coefficients of the
+#'   selection equation, ordered as `c(intercept, x1, z1)`.
+#' @param sigma Positive scalar, the standard deviation of the outcome error.
+#' @param rho Scalar in `(-1, 1)`, the correlation of the two error terms.
+#'
+#' @return A `data.frame` with `n` rows and the columns
+#'   \describe{
+#'     \item{`y`}{the count outcome, `NA` for every non-selected unit.}
+#'     \item{`s`}{the selection indicator, 0 or 1.}
+#'     \item{`x1`, `x2`}{the covariates of the outcome equation.}
+#'     \item{`z1`}{the exclusion restriction of the selection equation.}
+#'     \item{`y_complete`}{the outcome of every unit, including the
+#'       non-selected ones. Not used by the model, but handy for illustrating
+#'       the size of the selection bias.}
+#'   }
+#'
+#' @seealso [poisselect()], [sim_selection]
 #'
 #' @examples
-#' set.seed(1)
-#' d <- simulate_poisselect(200,
-#'   beta = c(1, 0.5), gamma = c(0.5, 1, -0.8),
-#'   sigma = 0.5, rho = 0.6
-#' )
-#' head(d)
-#' table(d$s)
+#' set.seed(42)
+#' simulated <- simulate_poisselect(n = 400, rho = 0.5)
+#' str(simulated)
+#' mean(simulated$s)
+#'
+#' fit <- poisselect(y ~ x1 + x2, s ~ x1 + z1, data = simulated)
+#' coef(fit, which = "outcome")
 #'
 #' @export
-simulate_poisselect <- function(n, beta, gamma, sigma, rho) {
-  n <- checkmate::asInt(n, lower = 50)
-  checkmate::assert_numeric(beta,
-    finite = TRUE, any.missing = FALSE,
-    min.len = 1
+simulate_poisselect <- function(n = 500L, beta = c(0.5, 0.8, -0.4),
+                                gamma = c(0.3, 0.5, 0.7), sigma = 0.6,
+                                rho = 0.5) {
+  check_simulate_arguments(n, beta, gamma, sigma, rho)
+  x1 <- rnorm(n)
+  x2 <- rnorm(n)
+  z1 <- rnorm(n)
+  u <- rnorm(n)
+  epsilon <- sigma * (rho * u + sqrt(1 - rho^2) * rnorm(n))
+  s <- as.integer(gamma[1L] + gamma[2L] * x1 + gamma[3L] * z1 + u > 0)
+  y_complete <- rpois(n, exp(beta[1L] + beta[2L] * x1 + beta[3L] * x2 +
+                               epsilon))
+  data.frame(
+    y = ifelse(s == 1L, y_complete, NA_integer_),
+    s = s,
+    x1 = x1,
+    x2 = x2,
+    z1 = z1,
+    y_complete = y_complete
   )
-  checkmate::assert_numeric(gamma,
-    finite = TRUE, any.missing = FALSE,
-    min.len = 1
-  )
-  if (length(gamma) < length(beta)) {
-    stop("`gamma` must be at least as long as `beta`: the selection ",
-      "equation contains all shared covariates plus the exclusion ",
-      "variables.",
-      call. = FALSE
-    )
+}
+
+#' Check the Arguments of simulate_poisselect()
+#'
+#' @inheritParams simulate_poisselect
+#'
+#' @return `invisible(TRUE)`.
+#' @noRd
+check_simulate_arguments <- function(n, beta, gamma, sigma, rho) {
+  assert_int(n, lower = 2L, .var.name = "n")
+  assert_numeric(beta, len = 3L, any.missing = FALSE, finite = TRUE,
+                 .var.name = "beta")
+  assert_numeric(gamma, len = 3L, any.missing = FALSE, finite = TRUE,
+                 .var.name = "gamma")
+  # checkmate has no open bounds, so sigma > 0 and |rho| < 1 are explicit.
+  assert_number(sigma, finite = TRUE, .var.name = "sigma")
+  if (sigma <= 0) {
+    stop("'sigma' must be strictly positive, but is ", sigma, ".",
+         call. = FALSE)
   }
-  checkmate::assert_number(sigma, lower = 1e-8, finite = TRUE)
-  checkmate::assert_number(rho, finite = TRUE)
+  assert_number(rho, finite = TRUE, .var.name = "rho")
   if (abs(rho) >= 1) {
-    stop("`rho` must lie strictly between -1 and 1.", call. = FALSE)
+    stop("'rho' must lie strictly between -1 and 1, but is ", rho, ".",
+         call. = FALSE)
   }
-  p <- length(beta)
-  q <- length(gamma)
-  # Shared covariates enter both design matrices; the w block only z.
-  x_shared <- matrix(stats::rnorm(n * (p - 1L)), nrow = n)
-  w_exclusion <- matrix(stats::rnorm(n * (q - p)), nrow = n)
-  x <- cbind(1, x_shared)
-  z <- cbind(1, x_shared, w_exclusion)
-  # Error construction: with independent v, e ~ N(0, 1), eps = sigma * v
-  # and u = rho * v + sqrt(1 - rho^2) * e give Var(u) = 1 and
-  # Cov(eps, u) = sigma * rho, i.e. Corr(eps, u) = rho exactly.
-  v <- stats::rnorm(n)
-  e <- stats::rnorm(n)
-  eps <- sigma * v
-  u <- rho * v + sqrt(1 - rho^2) * e
-  y_full <- stats::rpois(n, lambda = exp(drop(x %*% beta) + eps))
-  s <- as.integer(drop(z %*% gamma) + u > 0)
-  # y is unobserved (NA) wherever the unit is not selected.
-  result <- data.frame(y = ifelse(s == 1L, y_full, NA_integer_), s = s)
-  if (p > 1L) {
-    result[paste0("x", seq_len(p - 1L))] <- x_shared
-  }
-  if (q > p) {
-    result[paste0("w", seq_len(q - p))] <- w_exclusion
-  }
-  result
+  invisible(TRUE)
 }

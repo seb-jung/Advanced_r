@@ -2,31 +2,27 @@
 % Please edit documentation in R/methods_print.R
 \name{print.poisselect}
 \alias{print.poisselect}
-\title{Print a fitted Poisson selection model}
+\title{Print a Poisson Selection Model}
 \usage{
 \method{print}{poisselect}(x, digits = max(3L, getOption("digits") - 3L), ...)
 }
 \arguments{
 \item{x}{An object of class \code{"poisselect"}.}
 
-\item{digits}{Number of significant digits for the coefficients.}
+\item{digits}{Number of significant digits for the printed numbers.}
 
-\item{...}{Ignored (present for compatibility with the generic).}
+\item{...}{Currently ignored, present for consistency with the generic.}
 }
 \value{
 \code{x}, invisibly.
 }
 \description{
-Shows the call, case counts, log-likelihood, convergence status and the
-point estimates of both equations.
+Shows the call, the sample sizes, the maximised log-likelihood, the
+convergence status and the estimated coefficients of both equations together
+with \code{sigma} and \code{rho}.
 }
 \examples{
-set.seed(1)
-d <- simulate_poisselect(300,
-  beta = c(1, 0.5), gamma = c(0.5, 1, -0.8),
-  sigma = 0.5, rho = 0.5
-)
-fit <- poisselect(y ~ x1, s ~ x1 + w1, data = d, k = 8)
+fit <- poisselect(y ~ x1 + x2, s ~ x1 + z1, data = sim_selection)
 print(fit)
 
 }

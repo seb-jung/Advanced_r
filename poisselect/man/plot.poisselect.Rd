@@ -2,37 +2,46 @@
 % Please edit documentation in R/methods_plot.R
 \name{plot.poisselect}
 \alias{plot.poisselect}
-\title{Plot diagnostics for a fitted Poisson selection model}
+\title{Diagnostic Plots for a Poisson Selection Model}
 \usage{
-\method{plot}{poisselect}(x, which = c(1, 2), rho_grid = seq(-0.95, 0.95, by = 0.05), ...)
+\method{plot}{poisselect}(x, which = 1:2, max_count = NULL, n_grid = 41L, ...)
 }
 \arguments{
 \item{x}{An object of class \code{"poisselect"}.}
 
-\item{which}{Subset of \code{c(1, 2)} selecting the plots to draw.}
+\item{which}{Which plots to draw, a subset of \code{1:2}. Defaults to both.}
 
-\item{rho_grid}{Numeric grid of rho values strictly inside (-1, 1) for
-plot 2.}
+\item{max_count}{Largest count shown in the first plot. Defaults to \code{NULL},
+which uses the largest observed count, capped at the 99th percentile so
+that a single extreme count cannot flatten the whole picture.}
 
-\item{...}{Passed on to the underlying plotting calls.}
+\item{n_grid}{Number of grid points of the second plot, at least 5.}
+
+\item{...}{Currently ignored, present for consistency with the generic.}
 }
 \value{
-\code{x}, invisibly.
+\code{x}, invisibly. Called for the side effect of drawing.
 }
 \description{
-Plot 1 compares the observed relative frequencies of the selected counts
-with the model-implied count distribution (averaged over the selected
-units). Plot 2 shows the approximated log-likelihood along a grid of
-rho values with all other parameters held at their estimates; the dashed
-line marks the estimate, the dot the maximum on the grid.
+\strong{Plot 1 (fit of the count distribution)} compares the observed relative
+frequencies of the counts among the selected units with the count
+distribution that the fitted model implies for exactly those units. For a
+single selected unit the implied distribution is
+\deqn{\Pr(y_i = m \mid x_i, z_i, s_i = 1) \approx
+  \frac{\sum_{k=1}^K \frac{w_k}{\sqrt\pi} p(m \mid \mu_{ik})
+        \Phi(\eta_{ik})}
+       {\sum_{k=1}^K \frac{w_k}{\sqrt\pi} \Phi(\eta_{ik})},}
+and the plotted frequency of \code{m} is the average over all selected units.
+}
+\details{
+\strong{Plot 2 (log-likelihood along rho)} evaluates the log-likelihood on a grid
+of values for \code{rho} while all other parameters stay at their estimates. A
+pronounced peak means that \code{rho} is well identified; a flat curve is the
+typical symptom of a missing or weak exclusion restriction.
 }
 \examples{
-set.seed(1)
-d <- simulate_poisselect(300,
-  beta = c(1, 0.5), gamma = c(0.5, 1, -0.8),
-  sigma = 0.5, rho = 0.5
-)
-fit <- poisselect(y ~ x1, s ~ x1 + w1, data = d, k = 8)
+fit <- poisselect(y ~ x1 + x2, s ~ x1 + z1, data = sim_selection)
 plot(fit)
+plot(fit, which = 2)
 
 }

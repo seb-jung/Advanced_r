@@ -3,25 +3,49 @@
 \docType{package}
 \name{poisselect-package}
 \alias{poisselect-package}
-\title{poisselect: Poisson Selection Model for Count Data}
+\title{poisselect: Poisson Selection Models for Count Data}
 \description{
-Maximum likelihood estimation of a Poisson selection model for count data
-that are only observed for a selected subsample. The model couples a
-Poisson outcome equation with log-normal heterogeneity,
-\verb{ln mu = x'beta + eps}, and a probit selection equation,
-\verb{s = 1\{z'gamma + u > 0\}}, through jointly normal errors \verb{(eps, u)} with
-\code{Corr(eps, u) = rho}. A non-zero \code{rho} makes selection non-ignorable; the
-joint likelihood corrects the resulting bias of a plain Poisson GLM fit
-to the selected subsample. The likelihood integral over the outcome
-heterogeneity is approximated by Gauss-Hermite quadrature (Golub-Welsch
-nodes and weights) and evaluated on the log scale with the log-sum-exp
-trick for numerical stability.
+Estimates a Heckman-type selection model for count data by maximum
+likelihood. The whole estimation is implemented from scratch: the
+Gauss-Hermite nodes and weights, the approximated log-likelihood on the log
+scale together with its gradient, the optimisation with \code{\link[stats:optim]{stats::optim()}} and
+the standard errors from the numerical Hessian.
 }
+\section{Model}{
+
+The outcome equation models a count \eqn{y_i} that is observed for the
+selected units only, the selection equation the fully observed indicator
+\eqn{s_i}:
+\deqn{\ln \mu_i = x_i' \beta + \varepsilon_i, \quad
+      y_i \sim \mathrm{Poisson}(\mu_i),}
+\deqn{s_i^* = z_i' \gamma + u_i, \quad s_i = 1\{s_i^* > 0\},}
+with jointly normal error terms
+\deqn{(\varepsilon_i, u_i) \sim N_2\left(0,
+      \left[\begin{array}{cc} \sigma^2 & \rho\sigma \\
+      \rho\sigma & 1 \end{array}\right]\right).}
+The correlation \eqn{\rho} measures the strength of the selection bias; for
+\eqn{\rho = 0} the selection is ignorable and a plain Poisson GLM on the
+selected units would be consistent.
+}
+
+\section{Main entry points}{
+
+\describe{
+\item{\code{\link[=poisselect]{poisselect()}}}{fits the model and returns an object of class
+\code{"poisselect"} with \code{print}, \code{summary}, \code{plot}, \code{predict}, \code{coef},
+\code{vcov} and \code{logLik} methods.}
+\item{\code{\link[=simulate_poisselect]{simulate_poisselect()}}}{simulates data from the model.}
+\item{\link{sim_selection}}{a ready-made simulated data set with known true
+parameters.}
+}
+}
+
 \author{
-\strong{Maintainer}: Finn Metzler \email{finn.metzler@stud.uni-bamberg.de}
+\strong{Maintainer}: Sebastian Jung \email{jusebi88@gmail.com}
 
 Authors:
 \itemize{
+  \item Sebastian Jung \email{jusebi88@gmail.com}
   \item Finn Metzler \email{finn.metzler@stud.uni-bamberg.de}
 }
 

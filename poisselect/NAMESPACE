@@ -10,3 +10,47 @@ S3method(summary,poisselect)
 S3method(vcov,poisselect)
 export(poisselect)
 export(simulate_poisselect)
+importFrom(checkmate,
+  assert_data_frame,
+  assert_formula,
+  assert_int,
+  assert_list,
+  assert_names,
+  assert_number,
+  assert_numeric,
+  assert_subset
+)
+importFrom(graphics,
+  abline,
+  barplot,
+  box,
+  legend,
+  par,
+  points
+)
+importFrom(stats,
+  .getXlevels,
+  binomial,
+  delete.response,
+  dnorm,
+  dpois,
+  glm.fit,
+  model.frame,
+  model.matrix,
+  model.response,
+  na.pass,
+  optim,
+  optimHess,
+  pnorm,
+  poisson,
+  printCoefmat,
+  quantile,
+  rnorm,
+  rpois,
+  setNames,
+  terms
+)
+importFrom(utils,
+  head,
+  modifyList
+)

@@ -1,91 +1,88 @@
-# predict method: link, unconditional response expectation, and selection
-# probability, on the stored data or on new data.
-
-#' Build the design matrix a prediction type needs
+#' Predictions from a Poisson Selection Model
 #'
-#' With `newdata = NULL` the stored model matrix is returned (all n units).
-#' Otherwise the matrix is rebuilt from the stored terms and factor levels
-#' so that factor codings match the fit exactly; only the variables of the
-#' requested equation are required in `newdata`.
+#' @details
+#' The three types answer different questions.
 #'
-#' @noRd
-build_prediction_matrix <- function(object, newdata, equation) {
-  if (is.null(newdata)) {
-    return(object$model[[if (equation == "outcome") "x" else "z"]])
-  }
-  checkmate::assert_data_frame(newdata, min.rows = 1)
-  terms_rhs <- stats::delete.response(
-    object$model[[paste0("terms_", equation)]]
-  )
-  missing_vars <- setdiff(all.vars(terms_rhs), names(newdata))
-  if (length(missing_vars) > 0L) {
-    stop("`newdata` is missing variables required for this prediction ",
-      "type: ", paste(missing_vars, collapse = ", "), ".",
-      call. = FALSE
-    )
-  }
-  # na.pass + explicit finiteness check below: na.omit would silently drop
-  # rows, returning fewer predictions than newdata rows.
-  frame <- stats::model.frame(
-    terms_rhs,
-    data = newdata, na.action = stats::na.pass,
-    xlev = object$model[[paste0("xlevels_", equation)]]
-  )
-  design <- stats::model.matrix(terms_rhs, frame)
-  bad <- colnames(design)[colSums(!is.finite(design)) > 0L]
-  if (length(bad) > 0L) {
-    stop("`newdata` contains NA/NaN/Inf in required covariates: ",
-      paste(bad, collapse = ", "), ".",
-      call. = FALSE
-    )
-  }
-  design
-}
-
-#' Predict from a fitted Poisson selection model
+#' * `"link"` returns the linear predictor \eqn{x'\hat\beta} of the outcome
+#'   equation.
+#' * `"response"` returns the *unconditional* population mean
+#'   \eqn{\hat E[Y \mid x] = \exp(x'\hat\beta + \hat\sigma^2/2)}, that is the
+#'   mean averaged over the unobserved outcome heterogeneity
+#'   \eqn{\varepsilon}. This is deliberately not the mean of the selected
+#'   subpopulation \eqn{E[Y \mid x, s = 1]}, which would still carry the
+#'   selection bias. The factor \eqn{e^{\hat\sigma^2/2}} is the mean of the
+#'   log-normal multiplicative error, so `"response"` exceeds `exp("link")`.
+#' * `"pselect"` returns the selection probability \eqn{\Phi(z'\hat\gamma)}.
 #'
 #' @param object An object of class `"poisselect"`.
-#' @param newdata Optional `data.frame` with the covariates needed by the
-#'   requested `type` (`"link"`/`"response"`: outcome covariates,
-#'   `"pselect"`: selection covariates). Default `NULL` predicts for the
-#'   data the model was fitted on (all n units).
-#' @param type Type of prediction: `"response"` (default) returns the
-#'   unconditional population expectation
-#'   `E[Y | x] = exp(x'beta + sigma^2 / 2)` (averaged over the outcome
-#'   heterogeneity eps - not the selected mean `E[Y | x, s = 1]`),
-#'   `"link"` returns the linear predictor `x'beta`, and `"pselect"`
-#'   returns the selection probability `Phi(z'gamma)`.
-#' @param ... Ignored (present for compatibility with the generic).
+#' @param newdata Optional `data.frame` with the covariates at which to
+#'   predict. Defaults to `NULL`, which reuses the data the model was fitted
+#'   on. `"link"` and `"response"` need the covariates of the outcome equation,
+#'   `"pselect"` those of the selection equation.
+#' @param type Type of prediction, one of `"response"` (the default), `"link"`
+#'   or `"pselect"`.
+#' @param ... Currently ignored, present for consistency with the generic.
 #'
-#' @return Named numeric vector of predictions (names are the row names of
-#'   the data used).
+#' @return A numeric vector with one entry per row of `newdata`, or per row of
+#'   the original data if `newdata` is `NULL`.
 #'
 #' @examples
-#' set.seed(1)
-#' d <- simulate_poisselect(300,
-#'   beta = c(1, 0.5), gamma = c(0.5, 1, -0.8),
-#'   sigma = 0.5, rho = 0.5
-#' )
-#' fit <- poisselect(y ~ x1, s ~ x1 + w1, data = d, k = 8)
+#' fit <- poisselect(y ~ x1 + x2, s ~ x1 + z1, data = sim_selection)
+#'
 #' head(predict(fit))
-#' predict(fit, newdata = data.frame(x1 = c(-1, 0, 1)), type = "link")
+#' head(predict(fit, type = "link"))
+#' head(predict(fit, type = "pselect"))
+#'
+#' # Predictions for new covariate values.
+#' grid <- data.frame(x1 = c(-1, 0, 1), x2 = 0, z1 = 0)
+#' predict(fit, newdata = grid)
+#' predict(fit, newdata = grid, type = "pselect")
 #'
 #' @export
 predict.poisselect <- function(object, newdata = NULL,
-                               type = c("response", "link", "pselect"),
-                               ...) {
-  # match.arg() validates and resolves the default ("response").
+                               type = c("response", "link", "pselect"), ...) {
   type <- match.arg(type)
-  estimates <- object$coefficients
-  # link/response live on the outcome equation, pselect on the selection
-  # equation; only that equation's covariates are needed (and required).
-  equation <- if (type == "pselect") "selection" else "outcome"
+  assert_data_frame(newdata, min.rows = 1L, null.ok = TRUE,
+                    .var.name = "newdata")
+  equation <- switch(type, pselect = "selection", "outcome")
   design <- build_prediction_matrix(object, newdata, equation)
-  linear_predictor <- drop(design %*% estimates[[equation]])
-  # switch() for value dispatch instead of an if/else chain (style guide).
-  switch(type,
+  linear_predictor <- drop(design %*% object$coefficients[[equation]])
+  switch(
+    type,
     link = linear_predictor,
-    response = exp(linear_predictor + estimates$sigma^2 / 2),
-    pselect = stats::pnorm(linear_predictor)
+    response = exp(linear_predictor + object$sigma^2 / 2),
+    pselect = pnorm(linear_predictor)
   )
+}
+
+#' Design Matrix for a Prediction
+#'
+#' With new data the matrix is rebuilt from the stored `terms` and factor
+#' levels, so that factor codings match the fit exactly.
+#'
+#' @param object An object of class `"poisselect"`.
+#' @param newdata A `data.frame`, or `NULL` to reuse the fitted data.
+#' @param equation Either `"outcome"` or `"selection"`.
+#'
+#' @return A numeric design matrix.
+#' @noRd
+build_prediction_matrix <- function(object, newdata, equation) {
+  if (is.null(newdata)) {
+    return(object$model[[switch(equation, outcome = "x", selection = "z")]])
+  }
+  model_terms <- delete.response(object$model$terms[[equation]])
+  missing_variables <- setdiff(all.vars(model_terms), names(newdata))
+  if (length(missing_variables) > 0L) {
+    stop("'newdata' is missing the following variable(s) of the '", equation,
+         "' equation: ", toString(sQuote(missing_variables)), ".",
+         call. = FALSE)
+  }
+  frame <- model.frame(model_terms, data = newdata, na.action = na.pass,
+                       xlev = object$model$xlevels[[equation]])
+  incomplete <- names(frame)[colSums(is.na(frame)) > 0L]
+  if (length(incomplete) > 0L) {
+    stop("'newdata' contains missing values in the variable(s) ",
+         toString(sQuote(incomplete)), ".", call. = FALSE)
+  }
+  model.matrix(model_terms, frame)
 }

@@ -2,42 +2,55 @@
 % Please edit documentation in R/methods_predict.R
 \name{predict.poisselect}
 \alias{predict.poisselect}
-\title{Predict from a fitted Poisson selection model}
+\title{Predictions from a Poisson Selection Model}
 \usage{
 \method{predict}{poisselect}(object, newdata = NULL, type = c("response", "link", "pselect"), ...)
 }
 \arguments{
 \item{object}{An object of class \code{"poisselect"}.}
 
-\item{newdata}{Optional \code{data.frame} with the covariates needed by the
-requested \code{type} (\code{"link"}/\code{"response"}: outcome covariates,
-\code{"pselect"}: selection covariates). Default \code{NULL} predicts for the
-data the model was fitted on (all n units).}
+\item{newdata}{Optional \code{data.frame} with the covariates at which to
+predict. Defaults to \code{NULL}, which reuses the data the model was fitted
+on. \code{"link"} and \code{"response"} need the covariates of the outcome equation,
+\code{"pselect"} those of the selection equation.}
 
-\item{type}{Type of prediction: \code{"response"} (default) returns the
-unconditional population expectation
-\verb{E[Y | x] = exp(x'beta + sigma^2 / 2)} (averaged over the outcome
-heterogeneity eps - not the selected mean \code{E[Y | x, s = 1]}),
-\code{"link"} returns the linear predictor \verb{x'beta}, and \code{"pselect"}
-returns the selection probability \verb{Phi(z'gamma)}.}
+\item{type}{Type of prediction, one of \code{"response"} (the default), \code{"link"}
+or \code{"pselect"}.}
 
-\item{...}{Ignored (present for compatibility with the generic).}
+\item{...}{Currently ignored, present for consistency with the generic.}
 }
 \value{
-Named numeric vector of predictions (names are the row names of
-the data used).
+A numeric vector with one entry per row of \code{newdata}, or per row of
+the original data if \code{newdata} is \code{NULL}.
 }
 \description{
-Predict from a fitted Poisson selection model
+Predictions from a Poisson Selection Model
+}
+\details{
+The three types answer different questions.
+\itemize{
+\item \code{"link"} returns the linear predictor \eqn{x'\hat\beta} of the outcome
+equation.
+\item \code{"response"} returns the \emph{unconditional} population mean
+\eqn{\hat E[Y \mid x] = \exp(x'\hat\beta + \hat\sigma^2/2)}, that is the
+mean averaged over the unobserved outcome heterogeneity
+\eqn{\varepsilon}. This is deliberately not the mean of the selected
+subpopulation \eqn{E[Y \mid x, s = 1]}, which would still carry the
+selection bias. The factor \eqn{e^{\hat\sigma^2/2}} is the mean of the
+log-normal multiplicative error, so \code{"response"} exceeds \code{exp("link")}.
+\item \code{"pselect"} returns the selection probability \eqn{\Phi(z'\hat\gamma)}.
+}
 }
 \examples{
-set.seed(1)
-d <- simulate_poisselect(300,
-  beta = c(1, 0.5), gamma = c(0.5, 1, -0.8),
-  sigma = 0.5, rho = 0.5
-)
-fit <- poisselect(y ~ x1, s ~ x1 + w1, data = d, k = 8)
+fit <- poisselect(y ~ x1 + x2, s ~ x1 + z1, data = sim_selection)
+
 head(predict(fit))
-predict(fit, newdata = data.frame(x1 = c(-1, 0, 1)), type = "link")
+head(predict(fit, type = "link"))
+head(predict(fit, type = "pselect"))
+
+# Predictions for new covariate values.
+grid <- data.frame(x1 = c(-1, 0, 1), x2 = 0, z1 = 0)
+predict(fit, newdata = grid)
+predict(fit, newdata = grid, type = "pselect")
 
 }

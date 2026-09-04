@@ -2,91 +2,127 @@
 % Please edit documentation in R/poisselect.R
 \name{poisselect}
 \alias{poisselect}
-\title{Fit a Poisson selection model by maximum likelihood}
+\title{Fit a Poisson Selection Model}
 \usage{
-poisselect(outcome, selection, data, k = 20, start = NULL, control = list())
+poisselect(outcome, selection, data, K = 20, start = NULL, control = list())
 }
 \arguments{
-\item{outcome}{Two-sided formula for the outcome equation, e.g.
-\code{y ~ x1 + x2}. The response are the observed counts; it may (and
-should) be \code{NA} wherever \code{s = 0}, those values are ignored.}
+\item{outcome}{A two-sided formula for the outcome equation, for example
+\code{y ~ x1 + x2}. The response must be a non-negative integer-valued count and
+should be \code{NA} for the non-selected units.}
 
-\item{selection}{Two-sided formula for the selection equation, e.g.
-\code{s ~ x1 + w1}. The response is the fully observed 0/1 (or logical)
-selection indicator. For credible identification the selection
-equation should contain at least one variable that is not in the
-outcome equation (exclusion restriction); a warning is issued
-otherwise.}
+\item{selection}{A two-sided formula for the selection equation, for example
+\code{s ~ x1 + z1}. The response must be a fully observed indicator with the
+values 0 and 1 (or a logical vector).}
 
-\item{data}{A \code{data.frame} containing all variables used in the two
-formulas.}
+\item{data}{A \code{data.frame} containing all variables of both formulas. The
+covariates of the selection equation must be complete for every unit, the
+covariates of the outcome equation only for the selected units.}
 
-\item{k}{Single integerish value between 2 and 500: the number of
-Gauss-Hermite quadrature nodes. Default \code{20}.}
+\item{K}{Number of Gauss-Hermite quadrature nodes, a single integer between
+2 and 200. The default of 20 is accurate for the usual range of counts, see
+the section on accuracy.}
 
-\item{start}{Optional numeric vector of starting values in the order
-\code{c(beta, gamma, sigma, rho)} (length: number of outcome coefficients
-\itemize{
-\item number of selection coefficients + 2), with \code{sigma > 0} and
-\code{abs(rho) < 1}. Default \code{NULL} computes starting values from a
-Poisson GLM (outcome) and a probit GLM (selection).
-}}
+\item{start}{Optional numeric vector of starting values on the original
+scale, ordered as \code{c(beta, gamma, sigma, rho)} with \code{sigma > 0} and
+\code{abs(rho) < 1}. Defaults to \code{NULL}, which derives the starting values from
+a probit fit of the selection equation and a Poisson GLM on the selected
+units.}
 
-\item{control}{List of control arguments passed on to
-\code{\link[stats:optim]{stats::optim()}}; allowed entries are \code{maxit}, \code{reltol}, \code{abstol},
-\code{trace}, \code{REPORT}, \code{fnscale}, \code{parscale} and \code{ndeps}. \code{maxit}
-defaults to 500.}
+\item{control}{A named list of control parameters passed on to
+\code{\link[stats:optim]{stats::optim()}}, for example \code{list(maxit = 5000)}. Allowed entries are
+\code{maxit}, \code{reltol}, \code{abstol}, \code{trace}, \code{REPORT}, \code{fnscale}, \code{parscale} and
+\code{ndeps}.}
 }
 \value{
-An object of class \code{"poisselect"}: a list with elements
+An object of class \code{"poisselect"}, a list with the components
 \describe{
-\item{\code{coefficients}}{List with named vectors \code{outcome} (beta) and
-\code{selection} (gamma) plus scalars \code{sigma} and \code{rho}.}
-\item{\code{standard_errors}}{List with named vectors \code{outcome} and
-\code{selection}; \code{NA} if the Hessian could not be inverted.}
-\item{\code{vcov}}{Covariance matrix of the (beta, gamma) block with
-\verb{outcome:}/\verb{selection:} prefixed dimnames.}
-\item{\code{loglik}}{Approximated log-likelihood at the optimum.}
-\item{\code{df}}{Number of estimated parameters (p + q + 2).}
-\item{\code{aic}}{Akaike information criterion, \verb{-2 loglik + 2 df}.}
-\item{\code{convergence}}{Convergence code from \code{\link[stats:optim]{stats::optim()}} (0 means
-success).}
-\item{\code{optim_message}}{Message from \code{\link[stats:optim]{stats::optim()}}, or \code{NULL}.}
-\item{\code{n}}{Number of units.}
-\item{\code{n_selected}}{Number of selected units.}
-\item{\code{call}}{The matched call.}
-\item{\code{model}}{List with the model pieces (\code{y}, \code{s}, \code{x}, \code{z}, both
-\code{terms} objects, both \code{xlevels} lists, \code{k} and the quadrature
-rule \code{gh}) used by the methods.}
+\item{\code{call}}{the matched call.}
+\item{\code{coefficients}}{a list with the outcome coefficients \code{outcome}
+(beta) and the selection coefficients \code{selection} (gamma).}
+\item{\code{sigma}, \code{rho}}{the estimated standard deviation of the outcome
+error and the estimated error correlation.}
+\item{\code{standard_errors}}{a list with the standard errors of \code{outcome},
+\code{selection}, \code{sigma} and \code{rho}.}
+\item{\code{vcov}}{the covariance matrix of all parameters on the original
+scale.}
+\item{\code{loglik}, \code{npar}, \code{aic}}{the maximised log-likelihood, the number
+of estimated parameters and the AIC.}
+\item{\code{converged}, \code{convergence}, \code{counts}, \code{message}}{the convergence
+information reported by \code{\link[stats:optim]{stats::optim()}}.}
+\item{\code{n}, \code{n_selected}}{the number of units and the number of selected
+units.}
+\item{\code{K}, \code{quadrature}}{the number of quadrature nodes and the nodes
+and weights themselves.}
+\item{\code{model}}{the responses, design matrices, \code{terms} objects and
+factor levels of both equations, reused by the methods.}
+\item{\code{theta}}{the estimate on the unconstrained scale, reused by the
+profile plot.}
 }
 }
 \description{
-Estimates the Poisson selection model
-\deqn{\ln \mu_i = x_i'\beta + \varepsilon_i, \quad y_i \sim
-  \mathrm{Poisson}(\mu_i)}
-\deqn{s_i^* = z_i'\gamma + u_i, \quad s_i = 1\{s_i^* > 0\}}
-where the outcome \eqn{y_i} is only observed for selected units
-(\eqn{s_i = 1}) and the errors are jointly normal with
-\eqn{\mathrm{Var}(\varepsilon_i) = \sigma^2},
-\eqn{\mathrm{Var}(u_i) = 1} and
-\eqn{\mathrm{Corr}(\varepsilon_i, u_i) = \rho}. A non-zero \eqn{\rho}
-makes selection non-ignorable; joint maximum likelihood estimation of
-both equations corrects the bias a plain Poisson GLM would have on the
-selected subsample. The likelihood integral over the outcome
-heterogeneity is approximated by Gauss-Hermite quadrature with \code{k} nodes
-and evaluated on the log scale with the log-sum-exp trick. The range
-restrictions \eqn{\sigma > 0} and \eqn{-1 < \rho < 1} are enforced by
-optimising over \eqn{\log \sigma} and \eqn{\mathrm{atanh}\, \rho}.
+Estimates a Heckman-type selection model for count data by maximum
+likelihood. A Poisson outcome equation with log-normal unobserved
+heterogeneity is fitted jointly with a probit selection equation, so that
+the correlation \code{rho} between the two error terms corrects the bias of a
+plain Poisson GLM on the self-selected subsample.
 }
-\examples{
-set.seed(1)
-d <- simulate_poisselect(400,
-  beta = c(1, 0.5), gamma = c(0.5, 1, -0.8),
-  sigma = 0.5, rho = 0.6
-)
-fit <- poisselect(y ~ x1, s ~ x1 + w1, data = d, k = 10)
-print(fit)
-summary(fit)
-head(predict(fit))
+\details{
+The model consists of an outcome equation for the count \code{y}, which is
+observed for the selected units only, and a selection equation for the fully
+observed indicator \code{s}:
+\deqn{\ln \mu_i = x_i'\beta + \varepsilon_i, \quad
+      y_i \sim \mathrm{Poisson}(\mu_i),}
+\deqn{s_i^* = z_i'\gamma + u_i, \quad s_i = 1\{s_i^* > 0\},}
+\deqn{(\varepsilon_i, u_i) \sim N_2\left(0,
+      \left[\begin{array}{cc} \sigma^2 & \rho\sigma \\
+      \rho\sigma & 1\end{array}\right]\right).}
 
+The likelihood contains an integral over the outcome error that has no
+closed form. It is approximated by a \code{K}-point Gauss-Hermite quadrature, and
+the sum over the nodes is evaluated on the log scale with the log-sum-exp
+trick, so that large counts and extreme selection probabilities cannot
+overflow. The maximisation with \code{\link[stats:optim]{stats::optim()}} runs on the unconstrained
+parameters \code{log(sigma)} and \code{atanh(rho)} and uses the analytic gradient of
+the log-likelihood. Standard errors come from the numerical Hessian at the
+optimum and are transformed back to \code{sigma} and \code{rho} with the delta method.
+}
+\section{Accuracy of the quadrature}{
+
+A fixed \code{K}-point rule integrates accurately as long as the Poisson
+probability is a smooth function of the outcome error, which is the case for
+small and moderate counts. For counts in the hundreds combined with a large
+\code{sigma}, \code{K = 20} can be too coarse and the approximated likelihood may even
+have several local maxima. Refit with a larger \code{K} (say 40 or 80) and compare
+the estimates and log-likelihoods in such cases.
+}
+
+\section{Identification}{
+
+The selection equation should contain at least one \emph{exclusion restriction},
+that is a covariate which shifts the selection probability but does not
+appear in the outcome equation. Without it the model is identified through
+the functional form alone, which is weak in practice, and a warning is
+issued.
+}
+
+\examples{
+# A simulated data set with known parameters ships with the package.
+fit <- poisselect(y ~ x1 + x2, s ~ x1 + z1, data = sim_selection)
+fit
+
+# The true values are beta = c(0.5, 0.8, -0.4), gamma = c(0.3, 0.5, 0.7),
+# sigma = 0.6 and rho = 0.5, see ?sim_selection.
+summary(fit)
+
+# A plain Poisson GLM on the selected units is biased upwards here, because
+# units with a large outcome error are also more likely to be selected.
+selected <- subset(sim_selection, s == 1)
+coef(glm(y ~ x1 + x2, family = poisson, data = selected))
+coef(fit, which = "outcome")
+
+}
+\seealso{
+\code{\link[=summary.poisselect]{summary.poisselect()}}, \code{\link[=plot.poisselect]{plot.poisselect()}},
+\code{\link[=predict.poisselect]{predict.poisselect()}}, \code{\link[=simulate_poisselect]{simulate_poisselect()}}, \link{sim_selection}
 }
