@@ -2,50 +2,69 @@
 % Please edit documentation in R/simulate.R
 \name{simulate_poisselect}
 \alias{simulate_poisselect}
-\title{Simulate data from the Poisson selection model}
+\title{Simulate Data from a Poisson Selection Model}
 \usage{
-simulate_poisselect(n, beta, gamma, sigma, rho)
+simulate_poisselect(
+  n = 500L,
+  beta = c(0.5, 0.8, -0.4),
+  gamma = c(0.3, 0.5, 0.7),
+  sigma = 0.6,
+  rho = 0.5
+)
 }
 \arguments{
-\item{n}{Single integerish value \verb{>= 50}, the number of units.}
+\item{n}{Number of units, a single integer of at least 2.}
 
-\item{beta}{Finite numeric vector of outcome coefficients (intercept
-first), length \code{p >= 1}.}
+\item{beta}{Numeric vector of length 3 with the coefficients of the outcome
+equation, ordered as \code{c(intercept, x1, x2)}.}
 
-\item{gamma}{Finite numeric vector of selection coefficients (intercept
-first), length \code{q >= p}; the last \code{q - p} entries belong to the
-selection-only covariates \code{w}.}
+\item{gamma}{Numeric vector of length 3 with the coefficients of the
+selection equation, ordered as \code{c(intercept, x1, z1)}.}
 
-\item{sigma}{Single positive finite number: standard deviation of the
-outcome heterogeneity.}
+\item{sigma}{Positive scalar, the standard deviation of the outcome error.}
 
-\item{rho}{Single number strictly between -1 and 1: correlation of the
-two error terms.}
+\item{rho}{Scalar in \verb{(-1, 1)}, the correlation of the two error terms.}
 }
 \value{
-A \code{data.frame} with columns \code{y} (counts, \code{NA} where \code{s = 0}),
-\code{s} (0/1), the shared covariates \verb{x1, ...} (if \code{p > 1}) and the
-selection-only covariates \verb{w1, ...} (if \code{q > p}).
+A \code{data.frame} with \code{n} rows and the columns
+\describe{
+\item{\code{y}}{the count outcome, \code{NA} for every non-selected unit.}
+\item{\code{s}}{the selection indicator, 0 or 1.}
+\item{\code{x1}, \code{x2}}{the covariates of the outcome equation.}
+\item{\code{z1}}{the exclusion restriction of the selection equation.}
+\item{\code{y_complete}}{the outcome of every unit, including the
+non-selected ones. Not used by the model, but handy for illustrating
+the size of the selection bias.}
+}
 }
 \description{
-Generates a dataset that follows the poisselect model exactly. Shared
-covariates \verb{x1, ..., x_\{p-1\}} (iid standard normal) enter both
-equations; additional covariates \verb{w1, ..., w_\{q-p\}} (iid standard
-normal) enter only the selection equation and act as exclusion
-restrictions. The errors are built as \code{eps = sigma * v} and
-\code{u = rho * v + sqrt(1 - rho^2) * e} with independent standard normal
-\code{v}, \code{e}, which yields \code{Var(u) = 1} and \code{Corr(eps, u) = rho} exactly.
-The outcome is drawn as \verb{y ~ Poisson(exp(x'beta + eps))}, selection as
-\verb{s = 1\{z'gamma + u > 0\}}, and \code{y} is set to \code{NA} wherever \code{s = 0} -
-exactly like real data for this model.
+Draws a data set that follows the model of \code{\link[=poisselect]{poisselect()}} exactly, which
+makes it possible to check whether the estimator recovers known parameters.
+}
+\details{
+Three standard normal covariates are drawn: \code{x1} and \code{x2} enter the outcome
+equation, \code{x1} and \code{z1} the selection equation, so \code{z1} is the exclusion
+restriction that identifies the model. Both equations contain an intercept,
+hence \code{beta} and \code{gamma} have three elements each, ordered as
+\code{c(intercept, x1, x2)} and \code{c(intercept, x1, z1)}.
+
+The correlated errors are built from two independent standard normal draws
+\eqn{u} and \eqn{e} as \eqn{\varepsilon = \sigma(\rho u +
+\sqrt{1-\rho^2}\,e)}, which gives \eqn{\mathrm{Var}(\varepsilon) =
+\sigma^2}, \eqn{\mathrm{Var}(u) = 1} and \eqn{\mathrm{Cov}(\varepsilon, u)
+= \rho\sigma}. The function uses the random number generator of the current
+session, so call \code{\link[=set.seed]{set.seed()}} beforehand for reproducible data.
 }
 \examples{
-set.seed(1)
-d <- simulate_poisselect(200,
-  beta = c(1, 0.5), gamma = c(0.5, 1, -0.8),
-  sigma = 0.5, rho = 0.6
-)
-head(d)
-table(d$s)
+set.seed(42)
+simulated <- simulate_poisselect(n = 400, rho = 0.5)
+str(simulated)
+mean(simulated$s)
 
+fit <- poisselect(y ~ x1 + x2, s ~ x1 + z1, data = simulated)
+coef(fit, which = "outcome")
+
+}
+\seealso{
+\code{\link[=poisselect]{poisselect()}}, \link{sim_selection}
 }

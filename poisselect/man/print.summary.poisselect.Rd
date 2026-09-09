@@ -2,12 +2,22 @@
 % Please edit documentation in R/methods_summary.R
 \name{print.summary.poisselect}
 \alias{print.summary.poisselect}
-\title{Print a poisselect summary}
+\title{Print the Summary of a Poisson Selection Model}
 \usage{
-\method{print}{summary.poisselect}(x, ...)
+\method{print}{summary.poisselect}(
+  x,
+  digits = max(3L, getOption("digits") - 3L),
+  signif_stars = getOption("show.signif.stars"),
+  ...
+)
 }
 \arguments{
 \item{x}{An object of class \code{"summary.poisselect"}.}
+
+\item{digits}{Number of significant digits for the printed numbers.}
+
+\item{signif_stars}{Logical flag, whether to mark the p-values with
+significance stars. Defaults to the \code{show.signif.stars} option.}
 
 \item{...}{Passed on to \code{\link[stats:printCoefmat]{stats::printCoefmat()}}.}
 }
@@ -15,15 +25,10 @@
 \code{x}, invisibly.
 }
 \description{
-Print a poisselect summary
+Print the Summary of a Poisson Selection Model
 }
 \examples{
-set.seed(1)
-d <- simulate_poisselect(300,
-  beta = c(1, 0.5), gamma = c(0.5, 1, -0.8),
-  sigma = 0.5, rho = 0.5
-)
-fit <- poisselect(y ~ x1, s ~ x1 + w1, data = d, k = 8)
-print(summary(fit))
+fit <- poisselect(y ~ x1 + x2, s ~ x1 + z1, data = sim_selection)
+print(summary(fit), digits = 3)
 
 }

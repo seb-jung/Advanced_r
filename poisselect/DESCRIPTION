@@ -1,21 +1,33 @@
 Package: poisselect
 Type: Package
-Title: Poisson Selection Model for Count Data
+Title: Maximum Likelihood Estimation of Poisson Selection Models
 Version: 0.1.0
-Authors@R: person("Finn", "Metzler", role = c("aut", "cre"),
-    email = "finn.metzler@stud.uni-bamberg.de")
-Description: Maximum likelihood estimation of a Poisson selection model for
-    count data that are only observed for a selected subsample. The outcome
-    equation is a Poisson regression with a log-normal heterogeneity term,
-    the selection equation is a probit, and the two error terms are jointly
-    normal. The likelihood integral is approximated by Gauss-Hermite
-    quadrature and evaluated on the log scale with the log-sum-exp trick.
-    Includes print, summary, plot, predict, coef, vcov and logLik methods
-    and a data simulator for the model.
-License: MIT + file LICENSE
+Authors@R: c(
+    person("Sebastian", "Jung", email = "s_jung@stud.uni-bamberg.de",
+           role = c("aut", "cre")),
+    person("Finn", "Metzler", email = "finn.metzler@stud.uni-bamberg.de",
+           role = "aut"))
+Description: Fits a Heckman-type selection model for count data by maximum
+    likelihood. A Poisson outcome equation with log-normal unobserved
+    heterogeneity is estimated jointly with a probit selection equation, so
+    that the correlation between the two error terms corrects the bias that a
+    plain Poisson generalised linear model incurs when the outcome is observed
+    for a self-selected subsample only. The likelihood integral is approximated
+    by Gauss-Hermite quadrature and evaluated entirely on the log scale. The
+    fitted object has 'print', 'summary', 'plot', 'predict', 'coef', 'vcov' and
+    'logLik' methods, and a simulator for the model is included.
+License: GPL-3
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
-Imports: checkmate, stats, graphics, utils
-Suggests: testthat (>= 3.0.0)
+Depends:
+    R (>= 4.1.0)
+Imports:
+    checkmate (>= 2.1.0),
+    graphics,
+    stats,
+    utils
+Suggests:
+    testthat (>= 3.0.0)
 Config/testthat/edition: 3
+LazyData: true
 Config/roxygen2/version: 8.1.0
