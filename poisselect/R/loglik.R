@@ -142,7 +142,7 @@ log_sum_exp_rows <- function(a) {
 #'   - ln Phi(eta_ik): derivative phi(eta)/Phi(eta) (the inverse Mills
 #'     ratio) times d(eta_ik).
 #' Non-selected units only contribute the usual probit gradient of
-#' ln[1 - Phi(z'gamma)].
+#' ln(1 - Phi(z'gamma)).
 #'
 #' Because optim() works on log(sigma) and atanh(rho), the last two entries
 #' need the chain rule: d sigma / d log(sigma) = sigma and

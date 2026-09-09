@@ -8,7 +8,7 @@
 #' according to the assignment.
 #'
 #' One subtlety: with the log-normal error the Poisson GLM does not estimate
-#' beta_0 but beta_0 + sigma^2 / 2 (because E[exp(eps)] = exp(sigma^2 / 2)).
+#' beta_0 but beta_0 + sigma^2 / 2 (because E(exp(eps)) = exp(sigma^2 / 2)).
 #' So once we have a start for sigma we shift the intercept down by
 #' sigma^2 / 2.
 #'
