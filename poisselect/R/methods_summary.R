@@ -62,7 +62,8 @@ summary.poisselect <- function(object, ...) {
 #' @noRd
 build_coefficient_table <- function(estimate, standard_error) {
   z_value <- estimate / standard_error
-  # Two-sided p-value 2 * (1 - Phi(|z|)), evaluated as the upper tail.
+  # Two-sided p-value 2 * (1 - Phi(|z|)). Again computed via the upper tail
+  # so that a very large |z| gives a tiny p and not exactly 0.
   p_value <- 2 * pnorm(abs(z_value), lower.tail = FALSE)
   table <- cbind(estimate, standard_error, z_value, p_value)
   dimnames(table) <- list(names(estimate),

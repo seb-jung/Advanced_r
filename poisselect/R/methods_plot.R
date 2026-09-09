@@ -73,9 +73,14 @@ plot_count_distribution <- function(object, max_count) {
 
 #' Observed and Model-Implied Count Distribution of the Selected Units
 #'
-#' The denominator of the implied distribution does not depend on `m` and is
-#' computed once; only the Poisson factor of the numerator changes with `m`.
-#' Both are aggregated on the log scale like the likelihood itself.
+#' Computes both curves for plot 1. The observed part is just a table of the
+#' selected counts. The model-implied part uses the formula from the
+#' assignment: for each selected unit Pr(y = m | s = 1) is a ratio of two
+#' quadrature sums over the same nodes. The denominator (only the Phi
+#' factors) does not depend on m, so it is computed once; for each m only
+#' the Poisson factor in the numerator changes. Everything is done on the
+#' log scale with the same helpers as the likelihood, then averaged over the
+#' selected units.
 #'
 #' @param object An object of class `"poisselect"`.
 #' @param max_count Largest count to consider, or `NULL` for the automatic
@@ -85,6 +90,8 @@ plot_count_distribution <- function(object, max_count) {
 #' @noRd
 compute_count_distribution <- function(object, max_count) {
   observed_counts <- object$model$y_selected
+  # Default support: up to the largest count, but capped at the 99 % quantile
+  # so that one outlier (say y = 500) does not squash the whole plot.
   if (is.null(max_count)) {
     cap <- quantile(observed_counts, probs = 0.99, names = FALSE)
     max_count <- max(1L, min(max(observed_counts), ceiling(cap)))
@@ -132,8 +139,10 @@ plot_rho_profile <- function(object, n_grid) {
 
 #' Log-Likelihood on a Grid of Values for rho
 #'
-#' The grid stops short of the boundary, where `1 / sqrt(1 - rho^2)` diverges,
-#' and always contains the estimate itself.
+#' Evaluates the log-likelihood on a grid of rho values while all other
+#' parameters stay at their estimates. The grid stops at +-0.99 because
+#' 1 / sqrt(1 - rho^2) blows up at the boundary, and we add the estimate
+#' itself to the grid so that the peak of the curve is exactly the fit.
 #'
 #' @param object An object of class `"poisselect"`.
 #' @param n_grid Number of grid points.

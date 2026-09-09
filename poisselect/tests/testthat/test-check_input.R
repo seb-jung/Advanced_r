@@ -1,5 +1,6 @@
-# Every check gets its own expectation, and every expectation pins down a part
-# of the message, so a check cannot silently be replaced by a different one.
+# One test per input check. Each expect_error() also matches a piece of the
+# error message, not just "some error happened". Otherwise a test could
+# pass because a *different* check fired first, and we would never notice.
 
 test_that("the formulas must be two-sided formulas without '.'", {
   valid <- make_valid_data()
@@ -53,7 +54,8 @@ test_that("'control' must be a named list of optim() controls", {
 
 test_that("'start' must have the right length and stay in range", {
   valid <- make_valid_data()
-  # 2 outcome coefficients + 3 selection coefficients + sigma + rho = 7.
+  # y ~ x1 gives 2 outcome coefficients, s ~ x1 + z1 gives 3 selection
+  # coefficients, plus sigma and rho: 7 in total.
   expect_error(poisselect(y ~ x1, s ~ x1 + z1, valid, start = rep(0.1, 6L)),
                "'start' must have length 7")
   expect_error(poisselect(y ~ x1, s ~ x1 + z1, valid, start = rep(0.1, 8L)),
@@ -190,8 +192,8 @@ test_that("covariates must be complete where the likelihood uses them", {
   with_inf$x2[selected_row] <- Inf
   expect_error(poisselect(y ~ x1 + x2, s ~ x1 + z1, with_inf), "'x2'")
 
-  # The selection covariates enter for every unit, including the non-selected
-  # ones whose outcome is never used.
+  # z1 has to be complete for ALL units, also the non-selected ones: their
+  # y is never used, but they still enter the probit part of the likelihood.
   unselected_na <- valid
   unselected_na$z1[unselected_row] <- NA_real_
   expect_error(poisselect(y ~ x1, s ~ x1 + z1, unselected_na),
@@ -213,7 +215,7 @@ test_that("collinear and empty design matrices are rejected by name", {
                "'outcome' equation is rank deficient.*'x1_copy'")
   expect_error(poisselect(y ~ x1, s ~ x1 + z1 + x1_copy, valid),
                "'selection' equation is rank deficient.*'x1_copy'")
-  # A constant covariate is collinear with the intercept.
+  # A constant column is collinear with the intercept, classic mistake.
   valid$constant <- 1
   expect_error(poisselect(y ~ x1 + constant, s ~ x1 + z1, valid),
                "'constant'")
@@ -234,17 +236,19 @@ test_that("the sample must be larger than the number of parameters", {
 })
 
 test_that("a missing exclusion restriction produces a warning", {
-  # Such a fit is weakly identified and may raise further warnings about the
-  # boundary or the Hessian, so only the presence of this one is checked.
+  # A model without exclusion restriction is weakly identified, so the fit
+  # may also warn about rho at the boundary or a singular Hessian. We only
+  # care that the exclusion-restriction warning is among them.
   valid <- make_valid_data(n = 200L)
   warnings <- capture_warnings(poisselect(y ~ x1 + x2, s ~ x1 + x2, valid,
                                           K = 5L))
   expect_true(any(grepl("No exclusion restriction", warnings)))
-  # The intercept alone does not count as an exclusion restriction.
+  # The intercept is not an exclusion restriction, so this must warn too.
   warnings <- capture_warnings(poisselect(y ~ 0 + x1 + x2, s ~ x1 + x2, valid,
                                           K = 5L))
   expect_true(any(grepl("No exclusion restriction", warnings)))
-  # Extra covariates in the outcome equation only are fine.
+  # The other direction is fine: x2 only in the outcome equation is no
+  # problem, z1 is still an exclusion restriction.
   expect_silent(poisselect(y ~ x1 + x2, s ~ x1 + z1, valid, K = 5L))
 })
 

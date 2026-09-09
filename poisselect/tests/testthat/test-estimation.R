@@ -1,7 +1,8 @@
-# The parameter recovery tests are the central validation: on data simulated
-# from the model the estimator has to return the parameters that generated it.
-# The tolerances survive ordinary sampling variation at these sample sizes but
-# would catch a sign or scaling error.
+# The most important tests of the package: if we simulate data from the
+# model with known parameters, does poisselect() get those parameters back?
+# The tolerances (0.12 for coefficients, 0.2 for rho) are chosen so that
+# normal sampling noise at n = 2000 passes, but a sign error or a wrong
+# scaling (e.g. a missing sqrt(2)) would fail.
 
 test_that("the estimator recovers the parameters under selection bias", {
   fit <- fit_simulated(n = 2000L, rho = 0.5, seed = 11L)
@@ -35,16 +36,18 @@ test_that("the estimator recovers a negative correlation", {
 })
 
 test_that("ignoring the selection biases a plain Poisson GLM", {
-  # With rho > 0 the units with a large outcome error are over-represented, so
-  # the naive intercept is too large while poisselect() gets it right.
+  # This is the whole point of the package. With rho > 0 the units with a
+  # large outcome error are selected more often, so a plain GLM on the
+  # selected rows overestimates the intercept. poisselect() should not.
   set.seed(21L)
   simulated <- simulate_poisselect(n = 2500L, beta = true_beta,
                                    gamma = true_gamma, sigma = true_sigma,
                                    rho = 0.7)
   fit <- poisselect(y ~ x1 + x2, s ~ x1 + z1, data = simulated)
   naive <- glm(y ~ x1 + x2, family = poisson, data = subset(simulated, s == 1))
-  # The naive intercept also absorbs exp(sigma^2 / 2), so the comparison is
-  # made on the scale of the population mean.
+  # Careful with the comparison: the GLM intercept also absorbs the
+  # sigma^2 / 2 from the log-normal error, so we compare both on the scale
+  # of log E[Y | x] = beta_0 + sigma^2 / 2 (see start_values.R).
   naive_intercept <- unname(coef(naive)[1L])
   corrected_intercept <- unname(coef(fit, which = "outcome")[1L]) +
     fit$sigma^2 / 2
@@ -55,9 +58,10 @@ test_that("ignoring the selection biases a plain Poisson GLM", {
 })
 
 test_that("the Wald intervals cover the true parameters", {
-  # Over repeated samples the 95 percent intervals should cover the truth
-  # almost always; six replications catch standard errors that are off by a
-  # factor, which is what a wrong delta method would cause.
+  # Mini Monte Carlo: the 95 % Wald interval for rho should contain the true
+  # rho in (almost) every replication. Six replications are not enough to
+  # check the exact coverage, but enough to notice if the standard errors
+  # are off by a factor, which is what a wrong delta method would do.
   covered <- vapply(seq_len(6L), function(replication) {
     fit <- fit_simulated(n = 1200L, rho = 0.5, seed = 100L + replication)
     interval <- fit$rho + c(-1, 1) * 1.96 * fit$standard_errors$rho
@@ -70,7 +74,8 @@ test_that("the number of quadrature nodes barely changes the estimates", {
   coarse <- fit_simulated(n = 800L, rho = 0.5, seed = 31L, K = 20L)
   fine <- fit_simulated(n = 800L, rho = 0.5, seed = 31L, K = 60L)
   expect_equal(coef(coarse), coef(fine), tolerance = 0.01)
-  # The quadrature error must stay well below the statistical uncertainty.
+  # The change from K = 20 to K = 60 should be tiny compared to the standard
+  # errors, otherwise K = 20 would not be a reasonable default.
   expect_true(all(abs(coef(coarse) - coef(fine)) <
                     0.1 * sqrt(diag(vcov(fine)))))
   expect_equal(coarse$loglik, fine$loglik, tolerance = 1e-4)
@@ -85,7 +90,8 @@ test_that("user-supplied starting values lead to the same optimum", {
 })
 
 test_that("'control' is passed through to optim()", {
-  # One iteration cannot converge, which proves that the argument arrives.
+  # With maxit = 1 optim() cannot converge. If we get the non-convergence
+  # warning, the control list really made it through to optim().
   expect_warning(
     fit <- fit_simulated(n = 400L, rho = 0.5, seed = 51L,
                          control = list(maxit = 1L)),
@@ -99,8 +105,8 @@ test_that("the reported log-likelihood is a maximum of the likelihood", {
   fit <- reference_fit
   expect_equal(fit$loglik, compute_loglik(fit$theta, fit$model,
                                           fit$quadrature))
-  # The gradient vanishes at the optimum and every perturbation lowers the
-  # log-likelihood.
+  # At a maximum the gradient should be (almost) zero, and moving any single
+  # parameter a bit away should make the log-likelihood smaller.
   gradient <- compute_loglik_gradient(fit$theta, fit$model, fit$quadrature)
   expect_lt(max(abs(gradient)), 1e-3)
   perturbed <- vapply(seq_along(fit$theta), function(position) {

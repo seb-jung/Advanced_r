@@ -1,8 +1,10 @@
 #' Maximise the Approximated Log-Likelihood
 #'
-#' Runs BFGS on the unconstrained scale with the analytic gradient. A tight
-#' relative tolerance is affordable because every evaluation is vectorised, and
-#' it matters because the Hessian is taken at the returned point.
+#' The actual maximisation: BFGS via optim() on the unconstrained theta, with
+#' our analytic gradient. We use a much tighter reltol than the default,
+#' because the Hessian for the standard errors is computed at whatever
+#' point optim() returns, and that point should really be the maximum. Since
+#' the likelihood is vectorised the extra iterations cost almost nothing.
 #'
 #' @param theta_start Numeric vector of starting values on the unconstrained
 #'   scale.
@@ -13,6 +15,7 @@
 #' @return The list returned by [stats::optim()].
 #' @noRd
 maximise_loglik <- function(theta_start, model, quadrature, control) {
+  # Our defaults; anything the user passed in control overrides them.
   control <- modifyList(list(maxit = 1000L, reltol = 1e-10), control)
   optimum <- optim(
     par = theta_start,
@@ -29,8 +32,9 @@ maximise_loglik <- function(theta_start, model, quadrature, control) {
 
 #' Warn About Non-Convergence and Boundary Estimates
 #'
-#' Both are warnings rather than errors: the returned object is still useful
-#' for diagnosis, the user just must not trust it blindly.
+#' These are warnings and not errors on purpose. A fit that did not converge
+#' or that sits at rho = 0.999 is still useful for looking at what went
+#' wrong, the user just should not trust the numbers blindly.
 #'
 #' @param optimum The list returned by [stats::optim()].
 #' @param model A model list as built by [build_model_data()].

@@ -57,8 +57,10 @@ predict.poisselect <- function(object, newdata = NULL,
 
 #' Design Matrix for a Prediction
 #'
-#' With new data the matrix is rebuilt from the stored `terms` and factor
-#' levels, so that factor codings match the fit exactly.
+#' Without newdata we simply return the design matrix stored in the fit.
+#' With newdata we rebuild it from the stored `terms` and factor levels
+#' (xlevels), the same way predict.lm() does it, so that the dummy coding of
+#' factors is identical to the fit even if newdata has fewer levels.
 #'
 #' @param object An object of class `"poisselect"`.
 #' @param newdata A `data.frame`, or `NULL` to reuse the fitted data.
@@ -79,6 +81,9 @@ build_prediction_matrix <- function(object, newdata, equation) {
   }
   frame <- model.frame(model_terms, data = newdata, na.action = na.pass,
                        xlev = object$model$xlevels[[equation]])
+  # Check for NA on the model frame, not on the model matrix: model.matrix()
+  # would turn an NA column into a weird dummy called e.g. "x1TRUE" and the
+  # error message would name that instead of the real variable.
   incomplete <- names(frame)[colSums(is.na(frame)) > 0L]
   if (length(incomplete) > 0L) {
     stop("'newdata' contains missing values in the variable(s) ",

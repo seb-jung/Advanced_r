@@ -1,5 +1,8 @@
-# Generates the bundled example data set 'sim_selection'.
-# Run with the package loaded, for example via devtools::load_all().
+# This script creates the example data set 'sim_selection' that ships with
+# the package (data/sim_selection.rda). It only needs to be run again if the
+# simulator or the true parameters change. Run it from the package root with
+# the package loaded (devtools::load_all()), otherwise simulate_poisselect()
+# is not found.
 
 set.seed(20240501)
 

@@ -1,6 +1,12 @@
-# The main function only calls the named sub-tasks in order (top-down design).
-# The argument 'K' keeps the upper-case symbol of the assignment; it is the
-# only name that deviates from snake_case and is exempted from the linter.
+# Main function of the package. Following the top-down approach from the
+# lecture it does not do any real work itself, it just calls the sub-tasks
+# one after the other (check, build data, check again, quadrature, start
+# values, optimise, standard errors, build the object). Each sub-task has
+# its own file under R/.
+#
+# One style note: the argument is called 'K' (upper case) because that is
+# the symbol the assignment uses for the number of quadrature nodes.
+# Everything else is snake_case, so this single line gets a nolint marker.
 
 #' Fit a Poisson Selection Model
 #'

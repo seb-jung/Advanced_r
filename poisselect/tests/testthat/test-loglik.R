@@ -1,7 +1,8 @@
-# The log-likelihood is checked against a deliberately naive reference that
-# follows the formula of the assignment literally: unit by unit, node by node,
-# on the probability scale. The data for the comparison is scaled so that the
-# naive version does not underflow.
+# Our vectorised, log-scale likelihood is compared with a deliberately naive
+# version that follows the formula from the assignment word by word: a loop
+# over units, a loop over nodes, everything on the probability scale. The
+# naive version is slow and would underflow for big counts, but for small
+# test data it is the most convincing reference we have.
 
 naive_loglik <- function(beta, gamma, sigma, rho, y, s, x, z, n_nodes) {
   quadrature <- build_gauss_hermite(n_nodes)
@@ -46,7 +47,9 @@ test_that("compute_loglik() matches the naive evaluation of the formula", {
                    n_nodes)
     )
   }
-  # A wrong substitution factor must be detected by this comparison.
+  # Sanity check of the test itself: if we feed the reference sigma / sqrt(2)
+  # instead of sigma, the comparison must fail. Otherwise the test would
+  # not notice a missing sqrt(2) in the real code either.
   expect_false(isTRUE(all.equal(
     compute_loglik(pack_parameters(beta, gamma, 0.5, 0.4), model,
                    build_gauss_hermite(20L)),
@@ -56,8 +59,9 @@ test_that("compute_loglik() matches the naive evaluation of the formula", {
 })
 
 test_that("the likelihood separates into two parts when rho = 0", {
-  # For rho = 0 the selection term no longer depends on the node, so the
-  # likelihood factors into a probit likelihood and a Poisson mixture.
+  # Special case rho = 0: eta no longer depends on the node t_k, so Phi(eta)
+  # can be pulled out of the sum and the likelihood splits into a plain
+  # probit likelihood times a Poisson-log-normal mixture.
   model <- make_fixture()
   beta <- c(0.4, 0.7, -0.3)
   gamma <- c(0.2, 0.4, 0.6)
@@ -89,7 +93,8 @@ test_that("the likelihood approaches the Poisson GLM as sigma goes to zero", {
 })
 
 test_that("the likelihood stays finite for very large counts", {
-  # Building the inner sum on the probability scale would give -Inf here.
+  # y = 5000: dpois() is essentially 0 here, so without the log-sum-exp
+  # trick we would get log(0) = -Inf.
   model <- make_fixture()
   model$y_selected[1L] <- 5000
   value <- compute_loglik(
@@ -98,7 +103,8 @@ test_that("the likelihood stays finite for very large counts", {
   )
   expect_true(is.finite(value))
 
-  # A whole fit with counts in the hundreds must also run through cleanly.
+  # And a complete fit with counts in the hundreds has to run without any
+  # warning, not just the single likelihood evaluation.
   set.seed(11L)
   large <- simulate_poisselect(n = 800L, beta = c(4.5, 0.4, -0.2),
                                sigma = 0.3, rho = 0.5)
@@ -122,8 +128,8 @@ test_that("compute_negative_loglik() flips the sign and caps overflow", {
   theta <- pack_parameters(c(0.4, 0.7, -0.3), c(0.2, 0.4, 0.6), 0.5, 0.4)
   expect_equal(compute_negative_loglik(theta, model, quadrature),
                -compute_loglik(theta, model, quadrature))
-  # An absurd intercept drives every node to probability zero, which must
-  # yield the finite penalty rather than Inf.
+  # An absurd intercept (1e5) makes every Poisson probability 0 at every
+  # node. We expect the penalty value 1e10, not Inf or NaN.
   broken <- pack_parameters(c(1e5, 0, 0), c(0.2, 0.4, 0.6), 0.5, 0.4)
   expect_equal(compute_negative_loglik(broken, model, quadrature), 1e10)
 })
@@ -137,13 +143,14 @@ test_that("compute_node_pieces() returns the documented quantities", {
   expect_equal(dim(pieces$log_rate), c(model$n_selected, 5L))
   expect_equal(dim(pieces$eta), c(model$n_selected, 5L))
   expect_equal(pieces$log_weight, log(quadrature$weights) - 0.5 * log(pi))
-  # log(mu_ik) = x_i'beta + sqrt(2) sigma t_k for the first unit.
+  # Check the formula log(mu_ik) = x_i'beta + sqrt(2) sigma t_k by hand for
+  # the first unit.
   expect_equal(
     pieces$log_rate[1L, ],
     sum(model$x_selected[1L, ] * parameters$beta) +
       sqrt(2) * parameters$sigma * quadrature$nodes
   )
-  # eta_ik = (z_i'gamma + sqrt(2) rho t_k) / sqrt(1 - rho^2).
+  # Same for eta_ik = (z_i'gamma + sqrt(2) rho t_k) / sqrt(1 - rho^2).
   expect_equal(
     pieces$eta[1L, ],
     (sum(model$z_selected[1L, ] * parameters$gamma) +

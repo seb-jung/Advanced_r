@@ -1,12 +1,15 @@
-# The model requires sigma > 0 and -1 < rho < 1, but optim() works best
-# without restrictions. The optimisation therefore runs on the unconstrained
-# vector
+# The model needs sigma > 0 and -1 < rho < 1, but BFGS in optim() does not
+# know about bounds. Our solution: optimise over an unconstrained vector
 #
-#   theta = [ beta (n_beta), gamma (n_gamma), log(sigma), atanh(rho) ],
+#   theta = [ beta (n_beta), gamma (n_gamma), log(sigma), atanh(rho) ]
 #
-# whose back-transformations exp() and tanh() map the whole real line into the
-# admissible ranges. Fisher's z transformation atanh(rho) is the standard
-# choice for a correlation.
+# and transform back with exp() and tanh(). Both map the whole real line
+# into the allowed range, so the restrictions hold automatically and optim()
+# can never produce something like sigma = -0.3 or rho = 1.2. atanh(rho) is
+# Fisher's z-transformation, the usual choice for correlations.
+#
+# The functions below convert between theta and the named parameters, so
+# nobody else in the package has to know the layout of theta.
 
 #' Split the Unconstrained Vector into Model Parameters
 #'
@@ -39,8 +42,10 @@ pack_parameters <- function(beta, gamma, sigma, rho) {
 
 #' Names of the Full Parameter Vector
 #'
-#' Both equations usually share names, most obviously the intercept, so the
-#' equation is used as a prefix.
+#' Both equations usually have some names in common (at least the
+#' intercept, often x1 too), so we prefix them with the equation name.
+#' We use "_" and not ":" because in R a ":" in a name looks like an
+#' interaction term.
 #'
 #' @param model A model list as built by [build_model_data()].
 #'

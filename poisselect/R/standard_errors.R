@@ -1,13 +1,16 @@
 #' Covariance Matrix and Standard Errors at the Optimum
 #'
-#' The Hessian of the *negative* log-likelihood at the maximum is the observed
-#' information, and its inverse is the asymptotic covariance matrix on the
-#' unconstrained scale. Because the reported parameters are `sigma` and `rho`
-#' rather than `log(sigma)` and `atanh(rho)`, that matrix is transformed with
-#' the delta method: \eqn{V = J V_u J'} with the Jacobian \eqn{J} of the
-#' back-transformation. \eqn{J} is diagonal with ones for the coefficients,
-#' \eqn{d\sigma/d\ln\sigma = \sigma} and \eqn{d\rho/d\,\mathrm{atanh}\rho =
-#' 1 - \rho^2}, so the product reduces to an elementwise scaling.
+#' Standard errors from the Hessian, as required by the assignment. The
+#' Hessian of the negative log-likelihood at the maximum is the observed
+#' information matrix, and its inverse is the asymptotic covariance matrix.
+#'
+#' Problem: that covariance matrix belongs to theta, i.e. to log(sigma) and
+#' atanh(rho), but we want to report sigma and rho. Delta method: V = J V_u
+#' J' where J is the Jacobian of the back-transformation. J is diagonal (all
+#' ones for beta and gamma, then d sigma / d log(sigma) = sigma and
+#' d rho / d atanh(rho) = 1 - rho^2), so the matrix product boils down to
+#' multiplying V_u elementwise by outer(j, j). For beta and gamma nothing
+#' changes, which is also what the assignment expects.
 #'
 #' @param theta Numeric vector of parameter estimates on the unconstrained
 #'   scale.
@@ -18,8 +21,10 @@
 #'   `standard_errors`, both on the original scale.
 #' @noRd
 compute_standard_errors <- function(theta, model, quadrature) {
-  # optimHess() differentiates the analytic gradient numerically, which is
-  # far more accurate than differencing the log-likelihood twice.
+  # optimHess() takes numerical differences of our analytic gradient. That
+  # is one numerical derivative instead of two (differencing the
+  # log-likelihood twice), so it is a lot more accurate and we do not need
+  # the numDeriv package.
   information <- optimHess(
     theta,
     fn = compute_negative_loglik,

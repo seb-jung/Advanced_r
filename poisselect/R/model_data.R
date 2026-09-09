@@ -1,10 +1,12 @@
 #' Translate the Two Model Formulas into Responses and Design Matrices
 #'
-#' Both equations go through the same helper, so their model frames, design
-#' matrices, `terms` objects and factor levels are built in exactly the same
-#' way. The split into selected and non-selected units is done once here,
-#' because the likelihood is evaluated hundreds of times during the
-#' optimisation and should not repeat the subsetting.
+#' Turns the two formulas plus the data.frame into everything the likelihood
+#' needs. Both equations go through the same helper (DRY), so model frames,
+#' design matrices, `terms` and factor levels are all built the same way.
+#'
+#' We also split the rows into selected / non-selected right here, once.
+#' optim() calls the likelihood hundreds of times and it would be wasteful
+#' to redo the subsetting in every single call.
 #'
 #' @param outcome Two-sided formula of the outcome equation.
 #' @param selection Two-sided formula of the selection equation.
@@ -47,9 +49,10 @@ build_model_data <- function(outcome, selection, data) {
 
 #' Model Frame, Design Matrix and Terms of a Single Equation
 #'
-#' Missing values are passed through on purpose: the outcome is missing for
-#' every non-selected unit by construction, and the NA pattern is validated
-#' afterwards by [check_model_data()] with messages that name the variables.
+#' Important detail: `na.action = na.pass`. The default na.omit would throw
+#' away every row with an NA, but y is NA for all non-selected units by
+#' design. So we keep the NAs here and let [check_model_data()] decide
+#' afterwards which NAs are fine and which ones are errors.
 #'
 #' @param formula A two-sided formula.
 #' @param data A `data.frame`.
@@ -69,10 +72,11 @@ build_equation_data <- function(formula, data) {
 
 #' Coerce the Selection Response to a Numeric 0/1 Indicator
 #'
-#' Logical indicators are accepted for convenience. Factors and character
-#' vectors are rejected, because silently mapping their levels to 0 and 1 would
-#' make the direction of the selection equation depend on the alphabetical
-#' order of the labels.
+#' TRUE/FALSE is accepted and turned into 1/0. Factors and character vectors
+#' are rejected: we could map the levels to 0/1, but which level would be
+#' "selected"? It would depend on the alphabetical order of the labels, and
+#' a silent wrong guess flips the whole selection equation. So the user has
+#' to convert explicitly.
 #'
 #' @param response The response of the selection equation.
 #'

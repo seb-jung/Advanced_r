@@ -48,9 +48,10 @@ test_that("vcov() is a symmetric matrix matching the standard errors", {
 })
 
 test_that("the delta method scales sigma and rho correctly", {
-  # The covariance matrix is reported on the original scale, so its entries
-  # for sigma and rho are the unconstrained ones scaled by the derivatives
-  # d sigma / d log(sigma) = sigma and d rho / d atanh(rho) = 1 - rho^2.
+  # vcov() is supposed to be on the original scale (sigma, rho). So if we
+  # invert the Hessian ourselves and scale it with the delta-method
+  # Jacobian (1 for beta/gamma, sigma, 1 - rho^2) we must get exactly
+  # vcov(fit) back.
   unconstrained <- solve(optimHess(
     reference_fit$theta, compute_negative_loglik, compute_negative_gradient,
     model = reference_fit$model, quadrature = reference_fit$quadrature
@@ -131,7 +132,8 @@ test_that("predict() returns the documented quantities", {
   expect_equal(unname(link),
                unname(drop(reference_fit$model$x %*%
                              coef(reference_fit, which = "outcome"))))
-  # The unconditional population mean exp(x'beta + sigma^2 / 2).
+  # "response" is the unconditional mean exp(x'beta + sigma^2 / 2), not
+  # exp(x'beta), because the log-normal error has mean exp(sigma^2 / 2).
   expect_equal(unname(response),
                unname(exp(link + reference_fit$sigma^2 / 2)))
   expect_true(all(response > exp(link)))
@@ -159,7 +161,8 @@ test_that("predict() honours newdata and keeps factor levels", {
   simulated <- simulate_poisselect(n = 600L, rho = 0.4)
   simulated$group <- factor(rep(c("a", "b"), length.out = nrow(simulated)))
   fit <- poisselect(y ~ x1 + group, s ~ x1 + z1, data = simulated, K = 10L)
-  # newdata with a single level must still use the contrast coding of the fit.
+  # newdata only contains level "b". Without the stored xlevels R would
+  # build a factor with one level and the dummy column would be missing.
   new_level <- data.frame(x1 = 0, group = factor("b", levels = c("a", "b")))
   expect_equal(unname(predict(fit, newdata = new_level, type = "link")),
                unname(sum(coef(fit, which = "outcome") * c(1, 0, 1))))
@@ -188,15 +191,15 @@ test_that("the model-implied count distribution follows the formula", {
   counts <- compute_count_distribution(reference_fit, max_count = 40L)
   expect_equal(counts$count, 0:40)
   expect_true(all(counts$implied >= 0))
-  # Truncating at 40 loses almost no mass.
+  # The implied probabilities should sum to (almost) 1 up to m = 40.
   expect_gt(sum(counts$implied), 0.98)
   expect_lt(sum(counts$implied), 1 + 1e-8)
   observed_counts <- sim_selection$y[sim_selection$s == 1L]
   expect_equal(counts$observed[1L], mean(observed_counts == 0L))
   expect_lt(max(abs(counts$observed - counts$implied)), 0.05)
 
-  # Naive evaluation of the assignment's formula for m = 2, averaged over the
-  # selected units.
+  # Compare with a naive loop that evaluates the formula from the assignment
+  # for m = 2, unit by unit, and averages over the selected units.
   quadrature <- reference_fit$quadrature
   model <- reference_fit$model
   beta <- coef(reference_fit, "outcome")
@@ -212,7 +215,7 @@ test_that("the model-implied count distribution follows the formula", {
   }, numeric(1L)))
   expect_equal(counts$implied[3L], naive)
 
-  # Without max_count a single extreme count does not stretch the support.
+  # One crazy outlier (y = 500) must not make the plot go up to 500.
   stretched <- reference_fit
   stretched$model$y_selected[1L] <- 500L
   expect_lt(length(compute_count_distribution(stretched, NULL)$count), 100L)

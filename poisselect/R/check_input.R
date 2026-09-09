@@ -1,8 +1,15 @@
-# Input checks, in two stages ("fail fast, fail appropriately"):
-# check_arguments() validates what the user typed before any data is touched,
-# check_model_data() validates what the formulas imply once the design matrices
-# exist, which is where the NA pattern, collinearity and the exclusion
-# restriction become visible.
+# All the input checks for poisselect(). We split them into two stages, like
+# the "fail fast, fail appropriately" idea from the lecture:
+#
+#   1. check_arguments(): looks only at what the user typed (formulas, data,
+#      K, start, control). Runs before we touch the data at all, so obvious
+#      mistakes fail immediately.
+#   2. check_model_data(): runs after the design matrices are built. Some
+#      problems (NA pattern, collinear columns, missing exclusion
+#      restriction) can only be seen at that point.
+#
+# Every error message tries to say which argument is wrong, what is wrong
+# with it and, where possible, which variable is affected.
 
 #' Check the Arguments of poisselect()
 #'
@@ -24,8 +31,10 @@ check_arguments <- function(outcome, selection, data, n_nodes, start,
   check_formula(selection, "selection", "s ~ x1 + z1")
   assert_data_frame(data, min.rows = 1L, min.cols = 1L, .var.name = "data")
   check_variables_available(list(outcome, selection), data)
-  # A single node makes the rate independent of sigma, so K = 1 is rejected;
-  # beyond a few dozen nodes the accuracy gain is nil while the cost grows.
+  # K = 1 is not allowed: the only node would sit at t = 0, so sigma would
+  # drop out of the likelihood completely. The upper limit of 200 is a bit
+  # arbitrary, but above ~50 nodes nothing improves anymore and every
+  # likelihood evaluation just gets slower.
   assert_int(n_nodes, lower = 2L, upper = 200L, .var.name = "K")
   assert_numeric(start, any.missing = FALSE, finite = TRUE, null.ok = TRUE,
                  .var.name = "start")
@@ -55,7 +64,9 @@ check_formula <- function(formula, name, example) {
     stop("'", name, "' must be a two-sided formula such as '", example,
          "', but no left-hand side was given.", call. = FALSE)
   }
-  # '.' would put the response of the other equation among the covariates.
+  # We forbid the '.' shortcut on purpose. Both formulas use the same data
+  # set, so 'y ~ .' would silently put s (and z1 etc.) into the outcome
+  # equation, which makes no sense.
   if ("." %in% all.vars(formula)) {
     stop("'", name, "' must not use the '.' shortcut, because both equations ",
          "are built from the same data set. Please list the covariates ",
@@ -84,8 +95,9 @@ check_variables_available <- function(formulas, data) {
 
 #' Check the User-Supplied Starting Values
 #'
-#' Runs after [build_model_data()], because the required length is only known
-#' once the design matrices exist.
+#' This check cannot be part of check_arguments(), because we only know how
+#' long `start` has to be after the design matrices are built (number of
+#' columns of x and z, plus 2 for sigma and rho).
 #'
 #' @param start The starting values, or `NULL`.
 #' @param model A model list as built by [build_model_data()].
@@ -128,8 +140,9 @@ check_model_data <- function(model) {
   check_selection_indicator(model$s)
   check_outcome_counts(model$y, model$selected)
   check_sample_size(model)
-  # The outcome covariates enter the likelihood for the selected units only,
-  # the selection covariates for every unit.
+  # Which rows need to be complete depends on the equation: the outcome
+  # covariates are only used for the selected units (y is unknown for the
+  # others anyway), but the selection covariates are needed for everyone.
   check_design_matrix(model$x_selected, "outcome")
   check_design_matrix(model$z, "selection")
   check_exclusion_restriction(model)
@@ -192,7 +205,9 @@ check_outcome_counts <- function(y, selected) {
          sum(is_invalid), " of the ", length(observed), " selected units ",
          "violate this.", call. = FALSE)
   }
-  # With only zeros the intercept of the outcome equation runs off to -Inf.
+  # If every observed count is 0 the ML estimate does not exist, the
+  # intercept would just run off to -Inf. Better to stop here with a clear
+  # message than to return an intercept of -27 with a huge standard error.
   if (all(observed == 0)) {
     stop("The outcome is 0 for every selected unit, so the outcome equation ",
          "cannot be estimated.", call. = FALSE)
@@ -203,9 +218,10 @@ check_outcome_counts <- function(y, selected) {
 
 #' Report Outcome Values that the Model Ignores
 #'
-#' An observed outcome of a non-selected unit is not an error, simulated data
-#' regularly carries the complete outcome, but the value does not enter the
-#' likelihood, so the user is told.
+#' Sometimes y is available for non-selected units too (simulated data often
+#' has the complete outcome). That is not an error, the model just never uses
+#' those values. We still print a message, because it could also mean that
+#' the user mixed up the selection indicator.
 #'
 #' @inheritParams check_outcome_counts
 #'
@@ -244,8 +260,9 @@ check_design_matrix <- function(design, name) {
   }
   decomposition <- qr(design)
   if (decomposition$rank < ncol(design)) {
-    # qr() pivots the linearly dependent columns to the end, which is how they
-    # can be named in the message.
+    # Nice trick: qr() with pivoting moves the linearly dependent columns to
+    # the end of the pivot vector, so we can tell the user exactly which
+    # columns are the problem instead of just saying "rank deficient".
     aliased <- decomposition$pivot[-seq_len(decomposition$rank)]
     stop("The design matrix of the '", name, "' equation is rank deficient, ",
          "so its coefficients are not identified. The following column(s) ",
@@ -267,7 +284,8 @@ check_sample_size <- function(model) {
     stop("The model has ", n_parameter, " parameters but 'data' provides ",
          "only ", model$n, " observations.", call. = FALSE)
   }
-  # beta and sigma are estimated from the selected units alone.
+  # beta and sigma only get information from the selected units, so we also
+  # need enough of those, not just enough rows in total.
   if (model$n_selected <= model$n_beta + 1L) {
     stop("The outcome equation has ", model$n_beta, " coefficients plus ",
          "sigma, but the outcome is observed for only ", model$n_selected,
@@ -278,17 +296,19 @@ check_sample_size <- function(model) {
 
 #' Warn if There is No Exclusion Restriction
 #'
-#' Formally the model is identified through the non-linearity of the normal
-#' distribution function alone, but that identification is weak. A variable
-#' that shifts the selection probability without entering the outcome equation
-#' is what makes the estimate of `rho` trustworthy in practice.
+#' An exclusion restriction is a variable that affects the selection but is
+#' not in the outcome equation (z1 in our simulated data). Strictly speaking
+#' the model is identified without one, only through the non-linearity of
+#' Phi, but in practice that is very weak: the profile of rho gets flat and
+#' the standard errors explode. So we warn, but we do not stop.
 #'
 #' @param model A model list as built by [build_model_data()].
 #'
 #' @return `invisible(TRUE)`.
 #' @noRd
 check_exclusion_restriction <- function(model) {
-  # The intercept does not count as an exclusion restriction.
+  # The intercept does not count: it shifts the selection probability for
+  # everyone in the same way, so it cannot help to identify rho.
   exclusive <- setdiff(colnames(model$z), c("(Intercept)", colnames(model$x)))
   if (length(exclusive) == 0L) {
     warning("No exclusion restriction found: every covariate of the selection ",

@@ -55,6 +55,10 @@ simulate_poisselect <- function(n = 500L, beta = c(0.5, 0.8, -0.4),
   x1 <- rnorm(n)
   x2 <- rnorm(n)
   z1 <- rnorm(n)
+  # Correlated errors from two independent N(0, 1) draws: u is the selection
+  # error, and eps = sigma * (rho * u + sqrt(1 - rho^2) * e) has variance
+  # sigma^2 and correlation rho with u. (Quick check: Var = sigma^2 * (rho^2
+  # + 1 - rho^2) = sigma^2, Cov(eps, u) = sigma * rho.)
   u <- rnorm(n)
   epsilon <- sigma * (rho * u + sqrt(1 - rho^2) * rnorm(n))
   s <- as.integer(gamma[1L] + gamma[2L] * x1 + gamma[3L] * z1 + u > 0)
@@ -82,7 +86,8 @@ check_simulate_arguments <- function(n, beta, gamma, sigma, rho) {
                  .var.name = "beta")
   assert_numeric(gamma, len = 3L, any.missing = FALSE, finite = TRUE,
                  .var.name = "gamma")
-  # checkmate has no open bounds, so sigma > 0 and |rho| < 1 are explicit.
+  # checkmate's lower/upper are inclusive, but we need strict inequalities
+  # (sigma > 0, |rho| < 1), so those two are checked by hand.
   assert_number(sigma, finite = TRUE, .var.name = "sigma")
   if (sigma <= 0) {
     stop("'sigma' must be strictly positive, but is ", sigma, ".",

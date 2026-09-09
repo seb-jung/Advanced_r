@@ -17,7 +17,7 @@ new_poisselect <- function(optimum, uncertainty, model, quadrature, call) {
   dimnames(covariance) <- list(parameter_names, parameter_names)
   standard_errors <- uncertainty$standard_errors
   n_parameter <- length(parameter_names)
-  # optim() minimised the negative log-likelihood, so the sign is flipped back.
+  # We minimised the negative log-likelihood, so optimum$value is -loglik.
   loglik <- -optimum$value
   object <- list(
     call = call,

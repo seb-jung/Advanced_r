@@ -1,11 +1,16 @@
 #' Starting Values for the Optimiser
 #'
-#' Both equations are first estimated separately and without any selection
-#' correction, which is the model that would be right under `rho = 0`. The
-#' starting value for `rho` is therefore 0, the hypothesis of ignorable
-#' selection. A Poisson GLM estimates \eqn{\ln E[Y \mid x] = x'\beta +
-#' \sigma^2/2}, so its intercept is shifted down by \eqn{\sigma_0^2/2} to
-#' obtain a start for \eqn{\beta}.
+#' Good starting values matter a lot for BFGS. Our idea: fit both equations
+#' separately with plain GLMs first (probit for the selection, Poisson on
+#' the selected rows for the outcome). That is exactly the model under
+#' rho = 0, so rho starts at 0 as well ("selection is ignorable" as the
+#' starting hypothesis). glm()/glm.fit() is allowed for starting values
+#' according to the assignment.
+#'
+#' One subtlety: with the log-normal error the Poisson GLM does not estimate
+#' beta_0 but beta_0 + sigma^2 / 2 (because E[exp(eps)] = exp(sigma^2 / 2)).
+#' So once we have a start for sigma we shift the intercept down by
+#' sigma^2 / 2.
 #'
 #' @param model A model list as built by [build_model_data()].
 #' @param start User-supplied starting values on the original scale, ordered
@@ -36,10 +41,13 @@ compute_start_values <- function(model, start) {
 
 #' Probit Starting Values with a Check for Perfect Separation
 #'
-#' If some combination of the selection covariates separates the selected from
-#' the non-selected units perfectly, the probit coefficients have no finite
-#' maximum likelihood estimate, and neither has `gamma` in the full model. The
-#' probit fit reveals this through a deviance of numerically zero.
+#' Perfect separation: if some combination of the z-variables splits the
+#' selected and non-selected units perfectly (e.g. s = 1 exactly when
+#' z1 > 0), the probit ML estimate does not exist, the coefficients run off
+#' to infinity. The same then happens to gamma in the full model. The probit
+#' fit is a cheap detector for this: its deviance goes to (numerically) 0.
+#' Better to warn here than to return gamma = 408 with a standard error of
+#' 10000.
 #'
 #' @param model A model list as built by [build_model_data()].
 #'
@@ -58,10 +66,10 @@ fit_probit_start <- function(model) {
 
 #' Fit a GLM for Starting Values Only
 #'
-#' The warnings of `glm.fit()` about fitted probabilities of 0 or 1 or slow
-#' convergence are harmless for mere starting values and are silenced; any
-#' non-finite coefficient is replaced by zero so that the optimiser never
-#' receives NA.
+#' glm.fit() likes to warn about "fitted probabilities of 0 or 1" or slow
+#' convergence. For starting values that does not matter, so the warnings
+#' are suppressed. If a coefficient comes back NA or Inf anyway we replace
+#' it with 0, because optim() must never get a non-finite start.
 #'
 #' @param design A numeric design matrix.
 #' @param response The corresponding response vector.
@@ -77,10 +85,11 @@ fit_glm_start <- function(design, response, family) {
 
 #' Moment Estimator for the Starting Value of sigma
 #'
-#' Under the model \eqn{\mathrm{Var}(Y \mid x) = \mu + \mu^2 (e^{\sigma^2} -
-#' 1)}, so the variation in excess of the Poisson benchmark identifies
-#' \eqn{\sigma}. The value is bounded away from 0 and from implausibly large
-#' values, because a degenerate starting value would stall the optimiser.
+#' Moment estimator for sigma from the overdispersion. Under the model
+#' Var(Y | x) = mu + mu^2 * (exp(sigma^2) - 1), so whatever variance is left
+#' after subtracting the Poisson part tells us something about sigma. We
+#' clamp the result to a sensible range, because a start of sigma = 0 or
+#' sigma = 5 would make optim() get stuck right away.
 #'
 #' @param y Numeric vector of observed counts.
 #' @param fitted_mean Numeric vector of fitted Poisson means.
