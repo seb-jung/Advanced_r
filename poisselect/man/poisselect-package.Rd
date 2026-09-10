@@ -41,11 +41,11 @@ parameters.}
 }
 
 \author{
-\strong{Maintainer}: Sebastian Jung \email{jusebi88@gmail.com}
+\strong{Maintainer}: Sebastian Jung \email{s_jung@stud.uni-bamberg.de}
 
 Authors:
 \itemize{
-  \item Sebastian Jung \email{jusebi88@gmail.com}
+  \item Sebastian Jung \email{s_jung@stud.uni-bamberg.de}
   \item Finn Metzler \email{finn.metzler@stud.uni-bamberg.de}
 }
 

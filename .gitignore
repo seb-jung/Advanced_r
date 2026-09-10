@@ -4,5 +4,4 @@
 .Ruserdata
 .positai
 .DS_Store
-*.tar.gz
 *.Rcheck/
