@@ -10,9 +10,9 @@ Für die Entwicklung wurden verschiedene Versionen von **Claude (Anthropic)** ge
 
 Die Entwicklung erfolgte in drei wesentlichen Phasen:
 
-1.  **Planung und Strukturierung:** Die Projektstruktur ergab sich direkt aus dem top-down-orientierten Programmentwurf. Diese Struktur wurde von uns unter Verwendung verschiedener KI-Modelle umgesetzt, wobei wir kontinuierlich den Abgleich mit den Projektzielen sichergestellt haben.
+1.  **Planung und Strukturierung:** Die Projektstruktur ergab sich aus dem top-down-orientierten Programmentwurf. Diese Struktur wurde von uns unter Verwendung verschiedener KI-Modelle umgesetzt, wobei wir kontinuierlich den Abgleich mit den Projektzielen sichergestellt haben.
 2.  **Implementierung:** Gemäß den KI-Richtlinien wurden einzelne Funktionen – insbesondere Boilerplate-Code – durch KI unterstützt erstellt. Die Steuerung des Workflows und die inhaltliche Korrektheit der Logik blieben dabei stets in unserer Verantwortung. Der Großteil des R-Codes (Kernfunktionen, S3-Methoden, Gauß-Hermite-Quadratur, Log-Likelihood-Berechnungen) wurde unter Verwendung von KI-generierten Vorschlägen erstellt, die anschließend manuell geprüft wurden.
-3.  **Verifikation und Testing:** Die KI wurde eingesetzt, um unabhängige Prüfskripte zu schreiben (z.B. Monte-Carlo-Studien, Vergleiche mit Referenzformeln) und die `testthat`-Testsuite zu erweitern.
+3.  **Verifikation und Testing:** Die KI wurde eingesetzt, um umfangreiche, unabhängige Prüfskripte zu schreiben (z.B. Monte-Carlo-Studien, Vergleiche mit Referenzformeln) und die `testthat`-Testsuite zu erweitern.
 
 ## Eigenleistung und Verantwortung
 
