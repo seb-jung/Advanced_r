@@ -47,6 +47,33 @@ Das Modell besteht aus einer Outcome-Gleichung für die Zählvariable $y$ und ei
 
 Der Parameter $\rho$ misst die Korrelation zwischen den Fehlertermen und damit die Stärke der Selektionsverzerrung.
 
+## Paketdateien und Funktionen
+
+Eine Datei je Teilaufgabe des Top-Down-Entwurfs. **Fett** = exportiert (mit Hilfeseite), alle anderen Funktionen sind intern.
+
+| Datei (`R/`)         | Funktionen                                                                                                                                                       | Zweck                                                                                     |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| `poisselect.R`       | **`poisselect()`**                                                                                                                                               | Hauptfunktion, ruft die Teilschritte der Reihe nach auf                                   |
+| `check_input.R`      | `check_arguments()`, `check_formula()`, `check_variables_available()`, `check_start_values()`, `check_model_data()` mit `check_selection_indicator()`, `check_outcome_counts()`, `report_ignored_outcomes()`, `check_design_matrix()`, `check_sample_size()`, `check_exclusion_restriction()` | Input-Checks: erst die Argumente, dann die abgeleiteten Daten                              |
+| `model_data.R`       | `build_model_data()`, `build_equation_data()`, `as_selection_indicator()`                                                                                        | Formeln zu `y`, `s`, Designmatrizen, `terms`, Faktorstufen                                |
+| `gauss_hermite.R`    | `build_gauss_hermite()`                                                                                                                                          | Knoten und Gewichte (Golub-Welsch)                                                        |
+| `loglik.R`           | `compute_loglik()`, `compute_node_pieces()`, `compute_log_terms()`, `add_log_weight()`, `log_sum_exp_rows()`, `compute_loglik_gradient()`, `compute_negative_loglik()`, `compute_negative_gradient()` | Log-Likelihood auf der Log-Skala, analytischer Gradient, Zielfunktion für `optim()` |
+| `parameters.R`       | `split_parameters()`, `pack_parameters()`, `build_parameter_names()`                                                                                             | Reparametrisierung `log(sigma)`, `atanh(rho)`                                             |
+| `start_values.R`     | `compute_start_values()`, `fit_probit_start()`, `fit_glm_start()`, `estimate_start_sigma()`                                                                      | Startwerte aus Probit- und Poisson-GLM, Momentenschätzer für `sigma`                      |
+| `optimise.R`         | `maximise_loglik()`, `warn_about_fit()`                                                                                                                          | `optim()` (BFGS), Warnungen bei Nichtkonvergenz und Randlösungen                          |
+| `standard_errors.R`  | `compute_standard_errors()`, `invert_information()`, `extract_standard_errors()`                                                                                 | Hesse-Matrix, Inverse, Delta-Methode                                                      |
+| `new_poisselect.R`   | `new_poisselect()`                                                                                                                                               | Konstruktor des S3-Objekts                                                                |
+| `methods_print.R`    | **`print.poisselect()`**, `print_coefficient_block()`, `describe_convergence()`                                                                                  | Kurzausgabe                                                                               |
+| `methods_summary.R`  | **`summary.poisselect()`**, **`print.summary.poisselect()`**, `build_coefficient_table()`, `print_coefficient_table()`, `describe_selection_bias()`               | Koeffiziententabellen mit z- und p-Werten, `rho`, Log-Likelihood, AIC                     |
+| `methods_plot.R`     | **`plot.poisselect()`**, `plot_count_distribution()`, `compute_count_distribution()`, `plot_rho_profile()`, `compute_rho_profile()`                              | Plot 1: beobachtete vs. modell-implizierte Counts; Plot 2: Log-Likelihood entlang `rho`   |
+| `methods_predict.R`  | **`predict.poisselect()`**, `build_prediction_matrix()`                                                                                                          | `link`, `response`, `pselect`, auch für `newdata`                                         |
+| `methods_extract.R`  | **`coef.poisselect()`**, **`vcov.poisselect()`**, **`logLik.poisselect()`**                                                                                      | Extraktoren; `AIC()`/`BIC()` laufen über `logLik()`                                       |
+| `simulate.R`         | **`simulate_poisselect()`**, `check_simulate_arguments()`                                                                                                        | Daten aus dem Modell simulieren                                                           |
+| `data.R`             | Datensatz **`sim_selection`**                                                                                                                                    | Beispieldaten (n = 800) mit bekannten Parametern                                          |
+| `poisselect-package.R` | keine                                                                                                                                                          | Paketdokumentation, `@importFrom`                                                         |
+
+Tests liegen in `tests/testthat/` (6 Dateien, 340 Assertions).
+
 ## Wichtige Hinweise
 
 - **Schnittstelle:** Die Funktion `poisselect()` folgt dem Standard von `lm()` oder `glm()`.
